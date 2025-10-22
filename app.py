@@ -20,7 +20,67 @@ from email_helper import send_alert
 
 st.set_page_config(page_title="Social Media Safety AI", page_icon="🛡️", layout="wide")
 
-st.markdown("""
+# Create tabs for Main Dashboard, Pricing Plans, and About
+current_tab = st.session_state.get('selected_tab', 0)  # 0 for Main Dashboard, 1 for Pricing Plans, 2 for About
+tabs = ["Main Dashboard", "Pricing Plans", "About"]
+tab1, tab2, tab3 = st.tabs(tabs)
+
+# Select the appropriate tab index based on session state
+st.session_state.active_tab = current_tab
+
+with tab1:
+    # Sidebar and main dashboard content
+    st.sidebar.markdown("### 🧭 Controls")
+    st.sidebar.markdown("<div class='side-item'>Use controls below to customize analysis and display.</div>", unsafe_allow_html=True)
+    st.sidebar.markdown("---")
+
+    # Performance controls
+    st.sidebar.markdown("#### ⚙️ Performance")
+    sample_limit = st.sidebar.number_input("Max rows to process", min_value=1, value=500, step=50, key="max_rows_input")
+    batch_size_ui = st.sidebar.slider("Batch size", min_value=8, max_value=256, value=64, step=8, key="batch_size_slider")
+    use_embeddings = st.sidebar.toggle("Use embeddings (slower)", value=False, key="embeddings_toggle")
+    fast_mode = st.sidebar.toggle("Fast mode (skip external API calls)", value=True, help="Temporarily disables external API calls during this run to speed up processing.", key="fast_mode_toggle")
+
+    # Filters
+    st.sidebar.markdown("#### 🧭 Filters")
+    filter_levels = st.sidebar.multiselect("Show risk levels", ["High", "Medium", "Low"], default=["High", "Medium", "Low"], key="risk_levels_select")
+    min_risk = st.sidebar.slider("Min risk score", 0.0, 1.0, 0.0, 0.05, key="min_risk_slider")
+    user_search = st.sidebar.text_input("Search username contains", key="username_search")
+
+    st.sidebar.markdown("**AI Status:** <span class='ai-pulse'></span> <span style='margin-left:6px;'>Active</span>", unsafe_allow_html=True)
+    st.sidebar.markdown("---")
+    admin_alerts_open = st.sidebar.button("🚨 Open Admin Alerts Dashboard", key="admin_alerts_btn")
+
+    # Quick test for email settings
+    if st.sidebar.button("📬 Test Email Settings", key="test_email_btn"):
+        test_subj = "[Test] SMS_AI email settings"
+        test_body = "This is a test email from your SMS_AI instance. If you received this, SendGrid/SMTP is configured."
+        ok, err = send_alert(test_subj, test_body)
+        if ok:
+            st.sidebar.success("Test email sent to admin address.")
+        else:
+            st.sidebar.error(f"Test failed — {err or 'check SENDGRID_API_KEY or SMTP settings in .env and environment variables.'}")
+
+    # Quick test for advice generation
+    if st.sidebar.button("🧠 Test Advice (use last analysis)", key="test_advice_btn"):
+        sample_risk = None
+        if st.session_state.get('last_risk'):
+            sample_risk = st.session_state.get('last_risk')
+            sample_mitig = st.session_state.get('last_mitigate')
+        else:
+            st.sidebar.info("No previous analysis found; using a default sample.")
+            sample_risk = {"userID": 1, "username": "test", "comment_id": 1, "risk_score": 0.8, "risk_level": "High", "risk_reason": "hate speech"}
+            sample_mitig = {}
+        with st.sidebar.spinner("Generating advice..."):
+            try:
+                advice = generate_advice(sample_risk, sample_mitig)
+                st.sidebar.success("Advice generated (see details)")
+                with st.sidebar.expander("Advice JSON"):
+                    st.json(advice)
+            except Exception as e:
+                st.sidebar.error(f"Advice generation failed: {e}")
+
+    st.markdown("""
 <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">
 <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>
 <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap\" rel=\"stylesheet\">
@@ -51,379 +111,381 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.sidebar.markdown("### 🧭 Controls")
-st.sidebar.markdown("<div class='side-item'>Use controls below to customize analysis and display.</div>", unsafe_allow_html=True)
-st.sidebar.markdown("---")
+    # Main dashboard title and content
+    st.markdown("<div class='ai-title'>🧠 Social Media Safety AI</div>", unsafe_allow_html=True)
+    st.markdown("<div class='subtitle'>Analyze social media content for safety and risk assessment</div>", unsafe_allow_html=True)
 
-# Performance controls
-st.sidebar.markdown("#### ⚙️ Performance")
-sample_limit = st.sidebar.number_input("Max rows to process", min_value=1, value=500, step=50)
-batch_size_ui = st.sidebar.slider("Batch size", min_value=8, max_value=256, value=64, step=8)
-use_embeddings = st.sidebar.toggle("Use embeddings (slower)", value=False)
-fast_mode = st.sidebar.toggle("Fast mode (skip external API calls)", value=True, help="Temporarily disables external API calls during this run to speed up processing.")
+    # Analysis mode selection
+    analysis_mode = st.radio(
+        "Choose analysis mode:",
+        ["📝 Single Post Analysis", "📊 CSV Batch Analysis"],
+        horizontal=True,
+        key="analysis_mode_tab1"
+    )
 
-# Filters
-st.sidebar.markdown("#### 🧭 Filters")
-filter_levels = st.sidebar.multiselect("Show risk levels", ["High", "Medium", "Low"], default=["High", "Medium", "Low"])
-min_risk = st.sidebar.slider("Min risk score", 0.0, 1.0, 0.0, 0.05)
-user_search = st.sidebar.text_input("Search username contains")
-
-st.sidebar.markdown("**AI Status:** <span class='ai-pulse'></span> <span style='margin-left:6px;'>Active</span>", unsafe_allow_html=True)
-st.sidebar.markdown("---")
-admin_alerts_open = st.sidebar.button("🚨 Open Admin Alerts Dashboard")
-
-# Quick test for email settings (uses send_alert; will try SendGrid first if configured)
-if st.sidebar.button("📬 Test Email Settings"):
-    test_subj = "[Test] SMS_AI email settings"
-    test_body = "This is a test email from your SMS_AI instance. If you received this, SendGrid/SMTP is configured."
-    ok, err = send_alert(test_subj, test_body)
-    if ok:
-        st.sidebar.success("Test email sent to admin address.")
-    else:
-        st.sidebar.error(f"Test failed — {err or 'check SENDGRID_API_KEY or SMTP settings in .env and environment variables.'}")
-
-# Quick test for advice generation (uses ADVICE_API_PROVIDER / ADVICE_AGENT_URL or builtin)
-if st.sidebar.button("🧠 Test Advice (use last analysis)"):
-    sample_risk = None
-    if st.session_state.get('last_risk'):
-        sample_risk = st.session_state.get('last_risk')
-        sample_mitig = st.session_state.get('last_mitigate')
-    else:
-        st.sidebar.info("No previous analysis found; using a default sample.")
-        sample_risk = {"userID": 1, "username": "test", "comment_id": 1, "risk_score": 0.8, "risk_level": "High", "risk_reason": "hate speech"}
-        sample_mitig = {}
-    with st.sidebar.spinner("Generating advice..."):
-        try:
-            advice = generate_advice(sample_risk, sample_mitig)
-            st.sidebar.success("Advice generated (see details)")
-            with st.sidebar.expander("Advice JSON"):
-                st.json(advice)
-        except Exception as e:
-            st.sidebar.error(f"Advice generation failed: {e}")
-
-st.markdown("<div class='ai-title'>🧠 Social Media Safety AI</div>", unsafe_allow_html=True)
-st.markdown("<div class='subtitle'>Analyze social media content for safety and risk assessment</div>", unsafe_allow_html=True)
-
-# Analysis mode selection
-analysis_mode = st.radio(
-    "Choose analysis mode:",
-    ["📝 Single Post Analysis", "📊 CSV Batch Analysis"],
-    horizontal=True
-)
-
-if analysis_mode == "📝 Single Post Analysis":
-    st.markdown("### 📝 Single Post Analysis")
-    st.markdown("Enter a post or comment to analyze through our AI safety pipeline.")
-    
-    # User input form
-    with st.form("post_analysis_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            user_id = st.number_input("User ID", min_value=1, value=1, step=1)
-            username = st.text_input("Username", value="user123")
-        with col2:
-            comment_id = st.number_input("Comment ID", min_value=1, value=1, step=1)
+    if analysis_mode == "📝 Single Post Analysis":
+        st.markdown("### 📝 Single Post Analysis")
+        st.markdown("Enter a post or comment to analyze through our AI safety pipeline.")
         
-        post_text = st.text_area(
-            "Post/Comment Text", 
-            placeholder="Enter the post or comment you want to analyze...",
-            height=100
-        )
+        # User input form
+        # Create the form for post analysis
+        with st.form("post_analysis_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                user_id = st.number_input("User ID", min_value=1, value=1, step=1)
+                username = st.text_input("Username", value="user123")
+            with col2:
+                comment_id = st.number_input("Comment ID", min_value=1, value=1, step=1)
+            
+            post_text = st.text_area(
+                "Post/Comment Text", 
+                placeholder="Enter the post or comment you want to analyze...",
+                height=100
+            )
+            
+            analyze_post = st.form_submit_button("🔍 Analyze Post", use_container_width=True)
         
-        analyze_post = st.form_submit_button("🔍 Analyze Post", use_container_width=True)
-    
-    # Show results if user just submitted OR if we have saved results in session_state
-    if (analyze_post and post_text.strip()) or st.session_state.get("show_results"):
-        # If this run just submitted the form, perform analysis and persist to session_state
-        if analyze_post and post_text.strip():
-            # Process single post through the pipeline
-            with st.spinner("Analyzing post through AI pipeline..."):
-                # Create row data for analysis
-                row_data = {
-                    "userID": user_id,
-                    "username": username,
-                    "comment_id": comment_id,
-                    "comment": post_text.strip()
-                }
+        # Process form submission after the form block
+        if analyze_post and not post_text.strip():
+            st.error("Please enter some text to analyze.")
+        elif analyze_post or st.session_state.get("show_results"):
+            if analyze_post and post_text.strip():
+                with st.spinner("Analyzing post through AI pipeline..."):
+                        # Create row data for analysis
+                        row_data = {
+                            "userID": user_id,
+                            "username": username,
+                            "comment_id": comment_id,
+                            "comment": post_text.strip()
+                        }                        # Run through the analysis pipeline
+                        analyzed = analyze_row(row_data, embed=bool(use_embeddings))
+                        risk_out = compute_risk(analyzed)
+                        mitigate_out = mitigate(analyzed, risk_out, {})
+                        # Ensure comment text is available to the advice generator so URL checks run
+                        risk_for_advice = {**risk_out, "comment": row_data.get("comment")}
+                        advice_out = generate_advice(risk_for_advice, mitigation_out=mitigate_out)
 
-                # Run through the analysis pipeline
-                analyzed = analyze_row(row_data, embed=bool(use_embeddings))
-                risk_out = compute_risk(analyzed)
-                mitigate_out = mitigate(analyzed, risk_out, {})
-                # Ensure comment text is available to the advice generator so URL checks run
-                risk_for_advice = {**risk_out, "comment": row_data.get("comment")}
-                advice_out = generate_advice(risk_for_advice, mitigation_out=mitigate_out)
+                        # Persist to session state so subsequent reruns (like clicking send) keep showing results
+                        st.session_state['last_analyzed'] = analyzed
+                        st.session_state['last_risk'] = risk_out
+                        st.session_state['last_mitigate'] = mitigate_out
+                        st.session_state['last_advice'] = advice_out
+                        st.session_state['last_post_text'] = post_text
+                        st.session_state['last_user_id'] = user_id
+                        st.session_state['last_username'] = username
+                        st.session_state['show_results'] = True
+            
+            # Load from session state for display when user interacts (button clicks cause rerun)
+            analyzed = st.session_state.get('last_analyzed')
+            risk_out = st.session_state.get('last_risk')
+            mitigate_out = st.session_state.get('last_mitigate')
+            advice_out = st.session_state.get('last_advice')
+            post_text = st.session_state.get('last_post_text', '')
+            user_id = st.session_state.get('last_user_id', user_id)
+            username = st.session_state.get('last_username', username)
 
-                # Persist to session state so subsequent reruns (like clicking send) keep showing results
-                st.session_state['last_analyzed'] = analyzed
-                st.session_state['last_risk'] = risk_out
-                st.session_state['last_mitigate'] = mitigate_out
-                st.session_state['last_advice'] = advice_out
-                st.session_state['last_post_text'] = post_text
-                st.session_state['last_user_id'] = user_id
-                st.session_state['last_username'] = username
-                st.session_state['show_results'] = True
-        # Load from session state for display when user interacts (button clicks cause rerun)
-        analyzed = st.session_state.get('last_analyzed')
-        risk_out = st.session_state.get('last_risk')
-        mitigate_out = st.session_state.get('last_mitigate')
-        advice_out = st.session_state.get('last_advice')
-        post_text = st.session_state.get('last_post_text', '')
-        user_id = st.session_state.get('last_user_id', user_id)
-        username = st.session_state.get('last_username', username)
+            if analyzed and risk_out and mitigate_out and advice_out:
+                # Display results with improved frontend-style UI
+                st.success("✅ Analysis Complete!")
 
-        # Display results with improved frontend-style UI
-        st.success("✅ Analysis Complete!")
+                # Create tabs for results
+                result_tabs = st.tabs(["📝 Content Analysis", "🛡️ Risk Assessment", "💡 Advice", "🧯 Mitigation"])
 
-        # Create tabs for results
-        result_tabs = st.tabs(["📝 Content Analysis", "🛡️ Risk Assessment", "💡 Advice", "🧯 Mitigation"])
+                # --- Content Analysis Tab ---
+                with result_tabs[0]:
+                    st.subheader("Content Analysis")
+                    st.markdown("<div class='df-wrap glow-border'>", unsafe_allow_html=True)
+                    # Top preview and compact metadata cards
+                    st.markdown(f"### 🔎 Preview\n{post_text[:400]}{'...' if len(post_text) > 400 else ''}")
+                    # compact card row for metadata
+                    meta_html = f'''<div style="display:flex;gap:12px;margin-top:10px;"> 
+                        <div style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);"> <strong>User</strong><br>{username}</div>
+                        <div style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);"> <strong>User ID</strong><br>{user_id}</div>
+                        <div style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);"> <strong>Sentiment</strong><br>{analyzed.get('sentiment','Unknown').title()}</div>
+                        <div style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);"> <strong>Emotion</strong><br>{analyzed.get('emotion','Unknown').title()}</div>
+                        <div style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);"> <strong>Topic</strong><br>{analyzed.get('topic','Unknown').title()}</div>
+                    </div>'''
+                    st.markdown(meta_html, unsafe_allow_html=True)
 
-        # --- Content Analysis Tab ---
-        with result_tabs[0]:
-            st.subheader("Content Analysis")
-            st.markdown("<div class='df-wrap glow-border'>", unsafe_allow_html=True)
-            # Top preview and compact metadata cards
-            st.markdown(f"### 🔎 Preview\n{post_text[:400]}{'...' if len(post_text) > 400 else ''}")
-            # compact card row for metadata
-            meta_html = f'''<div style="display:flex;gap:12px;margin-top:10px;"> 
-                <div style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);"> <strong>User</strong><br>{username}</div>
-                <div style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);"> <strong>User ID</strong><br>{user_id}</div>
-                <div style="flex:1;padding:10px;border-radius:10px;background:linear-gradient(90deg,#fffbfb,#f0fcff);border:1px solid rgba(255,255,255,0.04);"> <strong>Sentiment</strong><br>{analyzed.get('sentiment','Unknown').title()}</div>
-                <div style="flex:1;padding:10px;border-radius:10px;background:linear-gradient(90deg,#fff8ff,#f7f0ff);border:1px solid rgba(255,255,255,0.04);"> <strong>Emotion</strong><br>{analyzed.get('emotion','Unknown').title()}</div>
-                <div style="flex:1;padding:10px;border-radius:10px;background:linear-gradient(90deg,#f8fff6,#f0fff0);border:1px solid rgba(255,255,255,0.04);"> <strong>Topic</strong><br>{analyzed.get('topic','Unknown').title()}</div>
-            </div>'''
-            st.markdown(meta_html, unsafe_allow_html=True)
+                    # Full analysis in expander (keeps UI clean)
+                    with st.expander("Show full content analysis (raw)"):
+                        st.json(analyzed)
+                    st.markdown("</div>", unsafe_allow_html=True)
 
-            # Full analysis in expander (keeps UI clean)
-            with st.expander("Show full content analysis (raw)"):
-                st.json(analyzed)
-            st.markdown("</div>", unsafe_allow_html=True)
+                        # --- Risk Assessment Tab ---
+                with result_tabs[1]:
+                    st.subheader("Risk Assessment")
+                    st.markdown("<div class='df-wrap glow-border'>", unsafe_allow_html=True)
+                    # Score and level
+                    risk_score = float(risk_out.get("risk_score", 0) or 0)
+                    risk_level = risk_out.get("risk_level", "Low")
+                    r_col1, r_col2 = st.columns([2,1])
+                    with r_col1:
+                        # Big gauge-like presentation using metric and progress
+                        if risk_level == "High":
+                            st.metric(label="Risk Level", value=f"🚨 {risk_level}", delta=f"{risk_score:.3f}")
+                        elif risk_level == "Medium":
+                            st.metric(label="Risk Level", value=f"⚠️ {risk_level}", delta=f"{risk_score:.3f}")
+                        else:
+                            st.metric(label="Risk Level", value=f"✅ {risk_level}", delta=f"{risk_score:.3f}")
+                        st.progress(min(max(risk_score, 0.0), 1.0))
+                        st.caption("Higher progress means higher estimated risk")
+                    with r_col2:
+                        # compact user info card row
+                        info_html = f'''<div style="display:flex;gap:8px;align-items:center;"> 
+                            <div style="flex:1;padding:8px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);"> <strong>User ID</strong><br>{risk_out.get('userID', user_id)}</div>
+                            <div style="flex:2;padding:8px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);"> <strong>Username</strong><br>{risk_out.get('username', username)}</div>
+                            <div style="flex:1;padding:8px;border-radius:10px;background:rgba(255,50,50,0.06);border:1px solid rgba(255,50,50,0.06);"> <strong>Anomaly</strong><br>{str(risk_out.get('anomaly_flag', False))}</div>
+                        </div>'''
+                        st.markdown(info_html, unsafe_allow_html=True)
+                        st.markdown("**User cumulative risk**")
+                        st.metric("Cumulative", f"{risk_out.get('user_cumulative_risk', 0):.3f}")
+                        st.markdown("**Contributing factors**")
+                        factors = risk_out.get("factors") or []
+                        if factors:
+                            for f in factors[:6]:
+                                st.info(f)
+                        else:
+                            st.write("No explicit factors provided")
 
-        # --- Risk Assessment Tab ---
-        with result_tabs[1]:
-            st.subheader("Risk Assessment")
-            st.markdown("<div class='df-wrap glow-border'>", unsafe_allow_html=True)
-            # Score and level
-            risk_score = float(risk_out.get("risk_score", 0) or 0)
-            risk_level = risk_out.get("risk_level", "Low")
-            r_col1, r_col2 = st.columns([2,1])
-            with r_col1:
-                # Big gauge-like presentation using metric and progress
-                if risk_level == "High":
-                    st.metric(label="Risk Level", value=f"🚨 {risk_level}", delta=f"{risk_score:.3f}")
-                elif risk_level == "Medium":
-                    st.metric(label="Risk Level", value=f"⚠️ {risk_level}", delta=f"{risk_score:.3f}")
-                else:
-                    st.metric(label="Risk Level", value=f"✅ {risk_level}", delta=f"{risk_score:.3f}")
-                st.progress(min(max(risk_score, 0.0), 1.0))
-                st.caption("Higher progress means higher estimated risk")
-            with r_col2:
-                # compact user info card row
-                info_html = f'''<div style="display:flex;gap:8px;align-items:center;"> 
-                    <div style="flex:1;padding:8px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);"> <strong>User ID</strong><br>{risk_out.get('userID', user_id)}</div>
-                    <div style="flex:2;padding:8px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);"> <strong>Username</strong><br>{risk_out.get('username', username)}</div>
-                    <div style="flex:1;padding:8px;border-radius:10px;background:rgba(255,50,50,0.06);border:1px solid rgba(255,50,50,0.06);"> <strong>Anomaly</strong><br>{str(risk_out.get('anomaly_flag', False))}</div>
-                </div>'''
-                st.markdown(info_html, unsafe_allow_html=True)
-                st.markdown("**User cumulative risk**")
-                st.metric("Cumulative", f"{risk_out.get('user_cumulative_risk', 0):.3f}")
-                st.markdown("**Contributing factors**")
-                factors = risk_out.get("factors") or []
-                if factors:
-                    for f in factors[:6]:
-                        st.info(f)
-                else:
-                    st.write("No explicit factors provided")
+                    # More details
+                    with st.expander("Show full risk output (raw)"):
+                        st.json(risk_out)
+                    st.markdown("</div>", unsafe_allow_html=True)
 
-            # More details
-            with st.expander("Show full risk output (raw)"):
-                st.json(risk_out)
-            st.markdown("</div>", unsafe_allow_html=True)
+                        # --- Advice Tab ---
+                with result_tabs[2]:
+                    st.subheader("AI Advice")
+                    st.markdown("<div class='df-wrap glow-border'>", unsafe_allow_html=True)
+                    advice_text = advice_out.get("advice") or advice_out.get("summary") or "No advice available"
+                    mod_sugg = advice_out.get("moderation_suggestion") or "No suggestion available"
+                    pred_beh = advice_out.get("predicted_behavior_risk")
 
-        # --- Advice Tab ---
-        with result_tabs[2]:
-            st.subheader("AI Advice")
-            st.markdown("<div class='df-wrap glow-border'>", unsafe_allow_html=True)
-            advice_text = advice_out.get("advice") or advice_out.get("summary") or "No advice available"
-            mod_sugg = advice_out.get("moderation_suggestion") or "No suggestion available"
-            pred_beh = advice_out.get("predicted_behavior_risk")
+                    st.markdown(f"### 💡 Recommendation\n{advice_text}")
+                    st.markdown(f"**Moderation suggestion:** {mod_sugg}")
+                    if pred_beh is not None:
+                        st.metric("Predicted behavior risk", f"{float(pred_beh):.3f}")
 
-            st.markdown(f"### 💡 Recommendation\n{advice_text}")
-            st.markdown(f"**Moderation suggestion:** {mod_sugg}")
-            if pred_beh is not None:
-                st.metric("Predicted behavior risk", f"{float(pred_beh):.3f}")
-
-            # Suggested actions list
-            actions = advice_out.get("suggested_actions") or advice_out.get("actions") or []
-            if actions:
-                for a in actions:
-                    st.write(f"- {a}")
-            else:
-                st.write("No explicit action list provided")
-
-            with st.expander("Show full advice output (raw)"):
-                st.json(advice_out)
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        # --- Mitigation Tab ---
-        with result_tabs[3]:
-            st.subheader("Mitigation Decision")
-            st.markdown("<div class='df-wrap glow-border'>", unsafe_allow_html=True)
-            final_status = mitigate_out.get("final_status", "Unknown")
-            mitigation_action = mitigate_out.get("mitigation_action", "No action")
-            label = mitigate_out.get("label", "")
-
-            st.markdown(f"**Label:** {label}")
-            if final_status == "Flagged":
-                st.error(f"🚨 Status: {final_status}")
-                st.markdown(f"**Action:** {mitigation_action}")
-            elif final_status == "Under Review":
-                st.warning(f"⚠️ Status: {final_status}")
-                st.markdown(f"**Action:** {mitigation_action}")
-            else:
-                st.success(f"✅ Status: {final_status}")
-                st.markdown(f"**Action:** {mitigation_action}")
-
-            # Mitigation metadata as styled cards
-            mit_html = f'''<div style="display:flex;gap:12px;margin-top:8px;"> 
-                <div style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);"> <strong>Toxicity</strong><br>{mitigate_out.get('toxicity_score', mitigate_out.get('toxicity', 'N/A'))}</div>
-                <div style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);"> <strong>Username</strong><br>{mitigate_out.get('username', username)}</div>
-                <div style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);"> <strong>User ID</strong><br>{mitigate_out.get('userID', user_id)}</div>
-                <div style="flex:1;padding:10px;border-radius:10px;background:linear-gradient(90deg,#ff3c3c22,#ffb4b422);border:1px solid rgba(255,60,60,0.06);"> <strong>Final Status</strong><br>{mitigate_out.get('final_status', final_status)}</div>
-                <div style="flex:1;padding:10px;border-radius:10px;background:linear-gradient(90deg,#6A0DAD22,#00FFFF22);border:1px solid rgba(106,13,173,0.06);"> <strong>Trend Priority</strong><br>{mitigate_out.get('trend_priority', mitigate_out.get('priority', 'N/A'))}</div>
-                <div style="flex:1;padding:10px;border-radius:10px;background:linear-gradient(90deg,#39FF1422,#00FFFF22);border:1px solid rgba(57,255,20,0.06);"> <strong>Alert Method</strong><br>{mitigate_out.get('alert_method', mitigate_out.get('alert_channel', 'N/A'))}</div>
-            </div>'''
-            st.markdown(mit_html, unsafe_allow_html=True)
-
-            with st.expander("Show full mitigation output (raw)"):
-                st.json(mitigate_out)
-
-            # Only show send-alert button when final_status is Flagged
-            if (mitigate_out and mitigate_out.get("final_status") == "Flagged"):
-                st.markdown("<div style='margin-top:10px'>", unsafe_allow_html=True)
-                if st.button("📧 Send alert to admin (Email)"):
-                    # Use persisted mitigate_out from session state to avoid losing data on rerun
-                    m = st.session_state.get('last_mitigate', mitigate_out)
-                    subj = f"[Alert] Flagged comment by {m.get('username', username)}"
-                    body = f"Comment ID: {m.get('comment_id')}\nUser: {m.get('username')}\nUser ID: {m.get('userID')}\nLabel: {m.get('label')}\nToxicity: {m.get('toxicity_score')}\nAction: {m.get('mitigation_action')}\nReasoning: {m.get('reasoning')}"
-                    ok, err = send_alert(subj, body)
-                    if ok:
-                        st.success("Alert email sent to admin.")
+                    # Suggested actions list
+                    actions = advice_out.get("suggested_actions") or advice_out.get("actions") or []
+                    if actions:
+                        for a in actions:
+                            st.write(f"- {a}")
                     else:
-                        st.error(f"Failed to send alert — {err or 'check SMTP or SENDGRID settings in .env and environment variables.'}")
-                st.markdown("</div>", unsafe_allow_html=True)
+                        st.write("No explicit action list provided")
 
-            st.markdown("</div>", unsafe_allow_html=True)
+                    with st.expander("Show full advice output (raw)"):
+                        st.json(advice_out)
+                    st.markdown("</div>", unsafe_allow_html=True)
+
+                        # --- Mitigation Tab ---
+                with result_tabs[3]:
+                    st.subheader("Mitigation Decision")
+                    st.markdown("<div class='df-wrap glow-border'>", unsafe_allow_html=True)
+                    final_status = mitigate_out.get("final_status", "Unknown")
+                    mitigation_action = mitigate_out.get("mitigation_action", "No action")
+                    label = mitigate_out.get("label", "")
+
+                    st.markdown(f"**Label:** {label}")
+                    if final_status == "Flagged":
+                        st.error(f"🚨 Status: {final_status}")
+                        st.markdown(f"**Action:** {mitigation_action}")
+                    elif final_status == "Under Review":
+                        st.warning(f"⚠️ Status: {final_status}")
+                        st.markdown(f"**Action:** {mitigation_action}")
+                    else:
+                        st.success(f"✅ Status: {final_status}")
+                        st.markdown(f"**Action:** {mitigation_action}")
+
+                    # Mitigation metadata as styled cards
+                    mit_html = f'''<div style="display:flex;gap:12px;margin-top:8px;"> 
+                        <div style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);"> <strong>Toxicity</strong><br>{mitigate_out.get('toxicity_score', mitigate_out.get('toxicity', 'N/A'))}</div>
+                        <div style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);"> <strong>Username</strong><br>{mitigate_out.get('username', username)}</div>
+                        <div style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);"> <strong>User ID</strong><br>{mitigate_out.get('userID', user_id)}</div>
+                        <div style="flex:1;padding:10px;border-radius:10px;background:linear-gradient(90deg,#ff3c3c22,#ffb4b422);border:1px solid rgba(255,60,60,0.06);"> <strong>Final Status</strong><br>{mitigate_out.get('final_status', final_status)}</div>
+                        <div style="flex:1;padding:10px;border-radius:10px;background:linear-gradient(90deg,#6A0DAD22,#00FFFF22);border:1px solid rgba(106,13,173,0.06);"> <strong>Trend Priority</strong><br>{mitigate_out.get('trend_priority', mitigate_out.get('priority', 'N/A'))}</div>
+                        <div style="flex:1;padding:10px;border-radius:10px;background:linear-gradient(90deg,#39FF1422,#00FFFF22);border:1px solid rgba(57,255,20,0.06);"> <strong>Alert Method</strong><br>{mitigate_out.get('alert_method', mitigate_out.get('alert_channel', 'N/A'))}</div>
+                    </div>'''
+                    st.markdown(mit_html, unsafe_allow_html=True)
+
+                    with st.expander("Show full mitigation output (raw)"):
+                        st.json(mitigate_out)
+
+                    # Only show send-alert button when final_status is Flagged
+                    if (mitigate_out and mitigate_out.get("final_status") == "Flagged"):
+                        st.markdown("<div style='margin-top:10px'>", unsafe_allow_html=True)
+                        if st.button("📧 Send alert to admin (Email)"):
+                            # Use persisted mitigate_out from session state to avoid losing data on rerun
+                            m = st.session_state.get('last_mitigate', mitigate_out)
+                            subj = f"[Alert] Flagged comment by {m.get('username', username)}"
+                            body = f"Comment ID: {m.get('comment_id')}\nUser: {m.get('username')}\nUser ID: {m.get('userID')}\nLabel: {m.get('label')}\nToxicity: {m.get('toxicity_score')}\nAction: {m.get('mitigation_action')}\nReasoning: {m.get('reasoning')}"
+                            ok, err = send_alert(subj, body)
+                            if ok:
+                                st.success("Alert email sent to admin.")
+                            else:
+                                st.error(f"Failed to send alert — {err or 'check SMTP or SENDGRID settings in .env and environment variables.'}")
+                        st.markdown("</div>", unsafe_allow_html=True)
+
+                    st.markdown("</div>", unsafe_allow_html=True)
     
-    elif analyze_post and not post_text.strip():
-        st.error("Please enter some text to analyze.")
 
-else:
-    # CSV Analysis Mode (existing functionality)
-    st.markdown("### 📊 CSV Batch Analysis")
-    st.markdown("Upload a CSV with columns: userID, username, comment_id, comment")
-    
-    uploaded_file = st.file_uploader("Choose CSV file", type=["csv"])
 
-    if uploaded_file is not None:
-        try:
-            df = pd.read_csv(uploaded_file)
-        except Exception as e:
-            st.error(f"Failed to read CSV: {e}")
-            st.stop()
+    elif analysis_mode == "📊 CSV Batch Analysis":
+        # CSV Analysis Mode (existing functionality)
+        st.markdown("### 📊 CSV Batch Analysis")
+        st.markdown("Upload a CSV with columns: userID, username, comment_id, comment")
+        
+        # Initialize empty DataFrames
+        df_analyzed = pd.DataFrame()
+        df_risk = pd.DataFrame()
+        df_advice = pd.DataFrame()
+        df_mitig = pd.DataFrame()
+        
+        uploaded_file = st.file_uploader("Choose CSV file", type=["csv"], key="csv_uploader_tab1")
+        
+        if uploaded_file is not None:
+            try:
+                df = pd.read_csv(uploaded_file)
+                
+                required = {"userID", "username", "comment_id", "comment"}
+                if not required.issubset(set(df.columns)):
+                    st.error(f"CSV must contain columns: {required}")
+                    st.stop()
 
-        required = {"userID", "username", "comment_id", "comment"}
-        if not required.issubset(set(df.columns)):
-            st.error(f"CSV must contain columns: {required}")
-            st.stop()
+                total_comments = len(df)
+                total_users = df["userID"].nunique()
 
-        total_comments = len(df)
-        total_users = df["userID"].nunique()
+                st.sidebar.metric("Total comments", total_comments)
+                st.sidebar.metric("Total users", total_users)
 
-        st.sidebar.metric("Total comments", total_comments)
-        st.sidebar.metric("Total users", total_users)
+                # Process rows in batches for scalability
+                BATCH_SIZE = int(batch_size_ui)
+                analyzed_list: List[Dict[str, Any]] = []
+                risk_list: List[Dict[str, Any]] = []
+                advice_list: List[Dict[str, Any]] = []
+                mitigation_list: List[Dict[str, Any]] = []
 
-        # Process rows in batches for scalability
-        BATCH_SIZE = int(batch_size_ui)
-        analyzed_list: List[Dict[str, Any]] = []
-        risk_list: List[Dict[str, Any]] = []
-        advice_list: List[Dict[str, Any]] = []
-        mitigation_list: List[Dict[str, Any]] = []
+                # simple user cumulative risk map
+                user_risk_map = {}
 
-        # simple user cumulative risk map
-        user_risk_map = {}
+                # Optional speed limit
+                if len(df) > sample_limit:
+                    df = df.head(sample_limit)
 
-        # Optional speed limit
-        if len(df) > sample_limit:
-            df = df.head(sample_limit)
+                # Temporarily disable external APIs for speed
+                restore_env = {}
+                if fast_mode:
+                    for key in ["HUGGINGFACE_API_KEY", "PERSPECTIVE_API_KEY"]:
+                        if key in os.environ:
+                            restore_env[key] = os.environ[key]
+                            os.environ.pop(key, None)
 
-        # Temporarily disable external APIs for speed
-        restore_env = {}
-        if fast_mode:
-            for key in ["HUGGINGFACE_API_KEY", "PERSPECTIVE_API_KEY"]:
-                if key in os.environ:
-                    restore_env[key] = os.environ[key]
-                    os.environ.pop(key, None)
+            except Exception as e:
+                st.error(f"Failed to read CSV: {e}")
+                st.stop()
 
-        progress = st.progress(0)
-        rows = []
-        for idx, row in df.iterrows():
-            rows.append({"userID": row["userID"], "username": row["username"], "comment_id": row["comment_id"], "comment": row["comment"]})
-            # when batch is full or last row, process batch
-            if len(rows) >= BATCH_SIZE or idx == len(df) - 1:
-                batch_out = analyze_batch(rows, embed=bool(use_embeddings))
-                for i, analyzed in enumerate(batch_out):
-                    prev = user_risk_map.get(analyzed["userID"])
-                    risk_out = compute_risk(analyzed, user_history_risk=prev)
-                    user_risk_map[analyzed["userID"]] = risk_out["user_cumulative_risk"]
+            required = {"userID", "username", "comment_id", "comment"}
+            if not required.issubset(set(df.columns)):
+                st.error(f"CSV must contain columns: {required}")
+                st.stop()
 
-                    # compute mitigation first so advice can reference the mitigation label and reasoning
-                    mitigate_out = mitigate(analyzed, risk_out, {})
-                    # Pass the comment into the advice generator so URL safety checks run
-                    risk_for_advice = {**risk_out, "comment": analyzed.get("comment")}
-                    advice_out = generate_advice(risk_for_advice, mitigation_out=mitigate_out)
+            total_comments = len(df)
+            total_users = df["userID"].nunique()
 
-                    analyzed_list.append(analyzed)
-                    risk_list.append(risk_out)
-                    advice_list.append(advice_out)
-                    mitigation_list.append(mitigate_out)
+            st.sidebar.metric("Total comments", total_comments)
+            st.sidebar.metric("Total users", total_users)
 
-                progress.progress(int((idx + 1) / total_comments * 100))
-                rows = []
+            # Process rows in batches for scalability
+            BATCH_SIZE = int(batch_size_ui)
+            analyzed_list: List[Dict[str, Any]] = []
+            risk_list: List[Dict[str, Any]] = []
+            advice_list: List[Dict[str, Any]] = []
+            mitigation_list: List[Dict[str, Any]] = []
 
-        progress.empty()
+            # simple user cumulative risk map
+            user_risk_map = {}
 
-        # Restore API keys if disabled
-        if restore_env:
-            for k, v in restore_env.items():
-                os.environ[k] = v
+            # Optional speed limit
+            if len(df) > sample_limit:
+                df = df.head(sample_limit)
 
-        # Convert to DataFrames for display
-        df_analyzed = pd.DataFrame(analyzed_list)
-        df_risk = pd.DataFrame(risk_list)
-        df_advice = pd.DataFrame(advice_list)
-        df_mitig = pd.DataFrame(mitigation_list)
+            # Temporarily disable external APIs for speed
+            restore_env = {}
+            if fast_mode:
+                for key in ["HUGGINGFACE_API_KEY", "PERSPECTIVE_API_KEY"]:
+                    if key in os.environ:
+                        restore_env[key] = os.environ[key]
+                        os.environ.pop(key, None)
 
-        # Apply sidebar filters
-        if not df_risk.empty:
-            mask = df_risk["risk_level"].isin(filter_levels) & (df_risk["risk_score"] >= min_risk)
-            if user_search:
-                mask = mask & df_risk["username"].astype(str).str.contains(user_search, case=False, na=False)
-            df_risk = df_risk[mask]
-            ids = set(df_risk["comment_id"].tolist())
-            if not df_advice.empty:
-                df_advice = df_advice[df_advice["comment_id"].isin(ids)]
-            if not df_mitig.empty:
-                df_mitig = df_mitig[df_mitig["comment_id"].isin(ids)]
-            if not df_analyzed.empty:
-                df_analyzed = df_analyzed[df_analyzed["comment_id"].isin(ids)]
+            progress = st.progress(0)
+            rows = []
+            for idx, row in df.iterrows():
+                rows.append({"userID": row["userID"], "username": row["username"], "comment_id": row["comment_id"], "comment": row["comment"]})
+                # when batch is full or last row, process batch
+                if len(rows) >= BATCH_SIZE or idx == len(df) - 1:
+                    batch_out = analyze_batch(rows, embed=bool(use_embeddings))
+                    for i, analyzed in enumerate(batch_out):
+                        prev = user_risk_map.get(analyzed["userID"])
+                        risk_out = compute_risk(analyzed, user_history_risk=prev)
+                        user_risk_map[analyzed["userID"]] = risk_out["user_cumulative_risk"]
+
+                        # compute mitigation first so advice can reference the mitigation label and reasoning
+                        mitigate_out = mitigate(analyzed, risk_out, {})
+                        # Pass the comment into the advice generator so URL safety checks run
+                        risk_for_advice = {**risk_out, "comment": analyzed.get("comment")}
+                        advice_out = generate_advice(risk_for_advice, mitigation_out=mitigate_out)
+
+                        analyzed_list.append(analyzed)
+                        risk_list.append(risk_out)
+                        advice_list.append(advice_out)
+                        mitigation_list.append(mitigate_out)
+
+                    progress.progress(int((idx + 1) / total_comments * 100))
+                    rows = []
+
+            progress.empty()
+
+            # Restore API keys if disabled
+            if restore_env:
+                for k, v in restore_env.items():
+                    os.environ[k] = v
+
+            # Convert to DataFrames for display
+            df_analyzed = pd.DataFrame(analyzed_list)
+            df_risk = pd.DataFrame(risk_list)
+            df_advice = pd.DataFrame(advice_list)
+            df_mitig = pd.DataFrame(mitigation_list)
+
+            # Apply sidebar filters
+            if not df_risk.empty:
+                mask = df_risk["risk_level"].isin(filter_levels) & (df_risk["risk_score"] >= min_risk)
+                if user_search:
+                    mask = mask & df_risk["username"].astype(str).str.contains(user_search, case=False, na=False)
+                df_risk = df_risk[mask]
+                ids = set(df_risk["comment_id"].tolist())
+                if not df_advice.empty:
+                    df_advice = df_advice[df_advice["comment_id"].isin(ids)]
+                if not df_mitig.empty:
+                    df_mitig = df_mitig[df_mitig["comment_id"].isin(ids)]
+                if not df_analyzed.empty:
+                    df_analyzed = df_analyzed[df_analyzed["comment_id"].isin(ids)]
 
         # Overview
         st.header("Overview")
         col1, col2, col3 = st.columns(3)
-        high_risk_count = df_risk[df_risk["risk_level"] == "High"].shape[0]
-        flagged_users = df_mitig[df_mitig["final_status"] == "Flagged"]["userID"].nunique()
-        category_counts = df_mitig["label"].value_counts().to_dict()
+        
+        # Handle empty DataFrames with safe defaults
+        high_risk_count = 0
+        if not df_risk.empty and "risk_level" in df_risk.columns:
+            high_risk_count = df_risk[df_risk["risk_level"] == "High"].shape[0]
+        
+        flagged_users = 0
+        if not df_mitig.empty and "final_status" in df_mitig.columns and "userID" in df_mitig.columns:
+            flagged_users = df_mitig[df_mitig["final_status"] == "Flagged"]["userID"].nunique()
+        
+        category_counts = {}
+        if not df_mitig.empty and "label" in df_mitig.columns:
+            category_counts = df_mitig["label"].value_counts().to_dict()
 
         col1.metric("High-risk comments", high_risk_count)
         col2.metric("Flagged users", flagged_users)
@@ -492,27 +554,36 @@ else:
             with colR1:
                 st.markdown("**Risk levels**")
                 try:
-                    rl = df_risk["risk_level"].value_counts().reset_index()
-                    rl.columns = ["risk_level","count"]
-                    if _ALT_AVAILABLE:
-                        rl_chart = alt.Chart(rl).mark_arc(innerRadius=40).encode(theta="count:Q", color=alt.Color("risk_level:N", scale=alt.Scale(range=['#FF3CAC','#FFD166','#39FF14'])))
-                        st.altair_chart(rl_chart, use_container_width=True)
+                    if not df_risk.empty and "risk_level" in df_risk.columns:
+                        rl = df_risk["risk_level"].value_counts().reset_index()
+                        rl.columns = ["risk_level","count"]
+                        if _ALT_AVAILABLE:
+                            rl_chart = alt.Chart(rl).mark_arc(innerRadius=40).encode(theta="count:Q", color=alt.Color("risk_level:N", scale=alt.Scale(range=['#FF3CAC','#FFD166','#39FF14'])))
+                            st.altair_chart(rl_chart, use_container_width=True)
+                        else:
+                            st.bar_chart(rl.set_index("risk_level")['count'])
                     else:
-                        st.bar_chart(rl.set_index("risk_level")['count'])
-                except Exception:
-                    st.bar_chart(df_risk["risk_level"].value_counts())
+                        st.info("No risk level data available")
+                except Exception as e:
+                    st.info("No risk level data available")
             with colR2:
                 st.markdown("**Top risky users**")
-                top_users = df_risk.groupby("userID")["risk_score"].mean().sort_values(ascending=False).head(10)
                 try:
-                    tu = top_users.reset_index().rename(columns={"risk_score":"avg_risk"})
-                    if _ALT_AVAILABLE:
-                        tu_chart = alt.Chart(tu).mark_line(point=True).encode(x=alt.X("userID:O"), y="avg_risk:Q", color=alt.value('#00FFFF'))
-                        st.altair_chart(tu_chart, use_container_width=True)
+                    if not df_risk.empty and "userID" in df_risk.columns and "risk_score" in df_risk.columns:
+                        top_users = df_risk.groupby("userID")["risk_score"].mean().sort_values(ascending=False).head(10)
+                        if not top_users.empty:
+                            tu = top_users.reset_index().rename(columns={"risk_score":"avg_risk"})
+                            if _ALT_AVAILABLE:
+                                tu_chart = alt.Chart(tu).mark_line(point=True).encode(x=alt.X("userID:O"), y="avg_risk:Q", color=alt.value('#00FFFF'))
+                                st.altair_chart(tu_chart, use_container_width=True)
+                            else:
+                                st.line_chart(tu.set_index("userID")['avg_risk'])
+                        else:
+                            st.info("No user risk data available")
                     else:
-                        st.line_chart(tu.set_index("userID")['avg_risk'])
-                except Exception:
-                    st.line_chart(top_users)
+                        st.info("No user risk data available")
+                except Exception as e:
+                    st.info("No user risk data available")
 
         with tabs[2]:
             st.subheader("Advice Agent")
@@ -663,8 +734,21 @@ else:
                 st.json(mitigation_list[0])
             st.markdown("</div>", unsafe_allow_html=True)
 
-        # Download final mitigation outputs
-        st.download_button("Download final report (CSV)", data=df_mitig.to_csv(index=False), file_name="mitigation_report.csv")
-
+            # Download final mitigation outputs
+            st.download_button("Download final report (CSV)", data=df_mitig.to_csv(index=False), file_name="mitigation_report.csv")
     else:
         st.info("Please upload a CSV file to begin.")
+
+with tab2:
+    # Clear the sidebar in pricing tab
+    st.sidebar.empty()
+    # Import and display only the pricing page
+    import pricing_page
+    pricing_page.display_pricing_page()
+
+with tab3:
+    # Clear the sidebar in about tab
+    st.sidebar.empty()
+    # Import and display the about page
+    import about_page
+    about_page.display_about_page()
