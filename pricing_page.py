@@ -358,7 +358,7 @@ def display_pricing_page():
             <p><em>Ideal for new users & testing</em></p>
             <ul>
                 <li>✔ API analysis access</li>
-                <li>❌ Email alerts</li>
+                <li>✅ Email alerts</li>
                 <li>Up to <b>10 single post analyses</b> / month</li>
                 <li>Up to <b>5 CSV batch uploads</b> / month</li>
                 <li>Basic advice (no detailed explanations)</li>
@@ -379,7 +379,7 @@ def display_pricing_page():
             <p><em>Best for regular content moderators</em></p>
             <ul>
                 <li>✔ API analysis access</li>
-                <li>❌ Email alerts</li>
+                <li>✅ Email alerts</li>
                 <li>Up to <b>200 single analyses</b> / month</li>
                 <li>Up to <b>50 CSV batch uploads</b> / month</li>
                 <li>Detailed advice & risk reasoning</li>
@@ -398,7 +398,7 @@ def display_pricing_page():
             <p><em>For large teams & platforms</em></p>
             <ul>
                 <li>✔ API analysis access</li>
-                <li>❌ Email alerts</li>
+                <li>✅ Email alerts</li>
                 <li>Unlimited single analyses</li>
                 <li>Unlimited CSV uploads</li>
                 <li>Priority API processing</li>

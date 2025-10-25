@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 from typing import Dict, Any, List
+from mitigation_table_helper import filter_mitigation_display
 try:
     import altair as alt
     _ALT_AVAILABLE = True
@@ -176,7 +177,7 @@ with tab1:
                         }                        # Run through the analysis pipeline
                         analyzed = analyze_row(row_data, embed=bool(use_embeddings))
                         risk_out = compute_risk(analyzed)
-                        mitigate_out = mitigate(analyzed, risk_out, {})
+                        mitigate_out = filter_mitigation_display(mitigate(analyzed, risk_out, {}))
                         # Ensure comment text is available to the advice generator so URL checks run
                         risk_for_advice = {**risk_out, "comment": row_data.get("comment")}
                         advice_out = generate_advice(risk_for_advice, mitigation_out=mitigate_out)
@@ -446,7 +447,7 @@ with tab1:
                         user_risk_map[analyzed["userID"]] = risk_out["user_cumulative_risk"]
 
                         # compute mitigation first so advice can reference the mitigation label and reasoning
-                        mitigate_out = mitigate(analyzed, risk_out, {})
+                        mitigate_out = filter_mitigation_display(mitigate(analyzed, risk_out, {}))
                         # Pass the comment into the advice generator so URL safety checks run
                         risk_for_advice = {**risk_out, "comment": analyzed.get("comment")}
                         advice_out = generate_advice(risk_for_advice, mitigation_out=mitigate_out)

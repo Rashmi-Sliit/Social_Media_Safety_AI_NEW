@@ -229,7 +229,7 @@ def compute_risk(analyzed: Dict[str, Any], user_history_risk: float = None) -> D
 
     return out
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     # Quick demo
     sample = {
         "userID": 101,
