@@ -10271,5 +10271,610 @@
         "Consider adding appeal process information"
       ]
     }
+  },
+  {
+    "timestamp": "2025-10-25T16:36:42.288354",
+    "decision": {
+      "userID": 101,
+      "username": "rashmi",
+      "comment_id": 1,
+      "toxicity_score": 0.405,
+      "label": "Cyberbullying",
+      "risk_level": "High",
+      "mitigation_action": "Add to review queue",
+      "final_status": "Under Review",
+      "alert_method": "Dashboard",
+      "user_history_risk": 0.52,
+      "trend_priority": "Medium",
+      "reasoning": "Contains hate speech; Contains inappropriate language; Shows negative sentiment",
+      "incident_logged": true,
+      "recommended_preventive_action": "",
+      "ai_systems_used": [
+        "Gemini AI"
+      ],
+      "decision_transparency": {
+        "factors_considered": [
+          "Content toxicity",
+          "User history",
+          "Context analysis",
+          "Pattern recognition"
+        ],
+        "appeal_process": "To appeal this decision, please contact our moderation team with your comment ID and any additional context that may help review your case."
+      },
+      "ethical_review": {
+        "compliant": true,
+        "warnings": [],
+        "suggestions": []
+      },
+      "bias_indicators": [],
+      "fairness_score": 1.0
+    },
+    "bias_indicators": [],
+    "fairness_score": 1.0,
+    "ethical_compliance": {
+      "compliant": true,
+      "warnings": [],
+      "suggestions": []
+    }
+  },
+  {
+    "timestamp": "2025-10-25T16:36:44.994214",
+    "decision": {
+      "userID": 102,
+      "username": "amila",
+      "comment_id": 2,
+      "toxicity_score": 0.12,
+      "label": "Privacy Leak",
+      "risk_level": "Medium",
+      "mitigation_action": "Notify moderator (privacy)",
+      "final_status": "Flagged",
+      "alert_method": "Email + Dashboard",
+      "user_history_risk": 0.2,
+      "trend_priority": "Low",
+      "reasoning": "Contains potential privacy information",
+      "incident_logged": true,
+      "recommended_preventive_action": "",
+      "ai_systems_used": [
+        "Gemini AI"
+      ],
+      "decision_transparency": {
+        "factors_considered": [
+          "Content toxicity",
+          "User history",
+          "Context analysis",
+          "Pattern recognition"
+        ],
+        "appeal_process": "To appeal this decision, please contact our moderation team with your comment ID and any additional context that may help review your case."
+      },
+      "ethical_review": {
+        "compliant": true,
+        "warnings": [],
+        "suggestions": [
+          "Consider adding appeal process information"
+        ]
+      },
+      "bias_indicators": [],
+      "fairness_score": 1.0
+    },
+    "bias_indicators": [],
+    "fairness_score": 1.0,
+    "ethical_compliance": {
+      "compliant": true,
+      "warnings": [],
+      "suggestions": [
+        "Consider adding appeal process information"
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-10-25T16:36:48.406048",
+    "decision": {
+      "userID": 103,
+      "username": "sam",
+      "comment_id": 3,
+      "toxicity_score": 0.405,
+      "label": "Cyberbullying",
+      "risk_level": "High",
+      "mitigation_action": "Add to review queue",
+      "final_status": "Under Review",
+      "alert_method": "Dashboard",
+      "user_history_risk": 0.52,
+      "trend_priority": "Medium",
+      "reasoning": "Contains hate speech; Contains inappropriate language; Shows negative sentiment",
+      "incident_logged": true,
+      "recommended_preventive_action": "",
+      "ai_systems_used": [
+        "Gemini AI"
+      ],
+      "decision_transparency": {
+        "factors_considered": [
+          "Content toxicity",
+          "User history",
+          "Context analysis",
+          "Pattern recognition"
+        ],
+        "appeal_process": "To appeal this decision, please contact our moderation team with your comment ID and any additional context that may help review your case."
+      },
+      "ethical_review": {
+        "compliant": true,
+        "warnings": [],
+        "suggestions": []
+      },
+      "bias_indicators": [],
+      "fairness_score": 1.0
+    },
+    "bias_indicators": [],
+    "fairness_score": 1.0,
+    "ethical_compliance": {
+      "compliant": true,
+      "warnings": [],
+      "suggestions": []
+    }
+  },
+  {
+    "timestamp": "2025-10-25T16:36:50.491390",
+    "decision": {
+      "userID": 104,
+      "username": "nuwan",
+      "comment_id": 4,
+      "toxicity_score": 0.12,
+      "label": "Privacy Leak",
+      "risk_level": "Medium",
+      "mitigation_action": "Notify moderator (privacy)",
+      "final_status": "Flagged",
+      "alert_method": "Email + Dashboard",
+      "user_history_risk": 0.2,
+      "trend_priority": "Low",
+      "reasoning": "Contains potential privacy information",
+      "incident_logged": true,
+      "recommended_preventive_action": "",
+      "ai_systems_used": [
+        "Gemini AI"
+      ],
+      "decision_transparency": {
+        "factors_considered": [
+          "Content toxicity",
+          "User history",
+          "Context analysis",
+          "Pattern recognition"
+        ],
+        "appeal_process": "To appeal this decision, please contact our moderation team with your comment ID and any additional context that may help review your case."
+      },
+      "ethical_review": {
+        "compliant": true,
+        "warnings": [],
+        "suggestions": [
+          "Consider adding appeal process information"
+        ]
+      },
+      "bias_indicators": [],
+      "fairness_score": 1.0
+    },
+    "bias_indicators": [],
+    "fairness_score": 1.0,
+    "ethical_compliance": {
+      "compliant": true,
+      "warnings": [],
+      "suggestions": [
+        "Consider adding appeal process information"
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-10-25T16:36:55.433966",
+    "decision": {
+      "userID": 105,
+      "username": "isha",
+      "comment_id": 5,
+      "toxicity_score": 0.013,
+      "label": "General",
+      "risk_level": "Low",
+      "mitigation_action": "No action",
+      "final_status": "Safe",
+      "alert_method": "None",
+      "user_history_risk": 0.044,
+      "trend_priority": "Low",
+      "reasoning": "No explicit concerns identified",
+      "incident_logged": true,
+      "recommended_preventive_action": "",
+      "ai_systems_used": [
+        "Gemini AI"
+      ],
+      "decision_transparency": {
+        "factors_considered": [
+          "Content toxicity",
+          "User history",
+          "Context analysis",
+          "Pattern recognition"
+        ],
+        "appeal_process": "To appeal this decision, please contact our moderation team with your comment ID and any additional context that may help review your case."
+      },
+      "ethical_review": {
+        "compliant": true,
+        "warnings": [],
+        "suggestions": []
+      },
+      "bias_indicators": [],
+      "fairness_score": 1.0
+    },
+    "bias_indicators": [],
+    "fairness_score": 1.0,
+    "ethical_compliance": {
+      "compliant": true,
+      "warnings": [],
+      "suggestions": []
+    }
+  },
+  {
+    "timestamp": "2025-10-25T16:36:59.403790",
+    "decision": {
+      "userID": 106,
+      "username": "dilan",
+      "comment_id": 6,
+      "toxicity_score": 0.405,
+      "label": "Cyberbullying",
+      "risk_level": "High",
+      "mitigation_action": "Add to review queue",
+      "final_status": "Under Review",
+      "alert_method": "Dashboard",
+      "user_history_risk": 0.4,
+      "trend_priority": "Medium",
+      "reasoning": "Contains hate speech; Contains inappropriate language; Shows negative sentiment",
+      "incident_logged": true,
+      "recommended_preventive_action": "",
+      "ai_systems_used": [
+        "Gemini AI"
+      ],
+      "decision_transparency": {
+        "factors_considered": [
+          "Content toxicity",
+          "User history",
+          "Context analysis",
+          "Pattern recognition"
+        ],
+        "appeal_process": "To appeal this decision, please contact our moderation team with your comment ID and any additional context that may help review your case."
+      },
+      "ethical_review": {
+        "compliant": true,
+        "warnings": [],
+        "suggestions": []
+      },
+      "bias_indicators": [],
+      "fairness_score": 1.0
+    },
+    "bias_indicators": [],
+    "fairness_score": 1.0,
+    "ethical_compliance": {
+      "compliant": true,
+      "warnings": [],
+      "suggestions": []
+    }
+  },
+  {
+    "timestamp": "2025-10-25T16:37:03.626840",
+    "decision": {
+      "userID": 107,
+      "username": "kamal",
+      "comment_id": 7,
+      "toxicity_score": 0.129,
+      "label": "Privacy Leak",
+      "risk_level": "Medium",
+      "mitigation_action": "Notify moderator (privacy)",
+      "final_status": "Flagged",
+      "alert_method": "Email + Dashboard",
+      "user_history_risk": 0.429,
+      "trend_priority": "Low",
+      "reasoning": "Contains potential privacy information; Shows patterns of potential scam",
+      "incident_logged": true,
+      "recommended_preventive_action": "",
+      "ai_systems_used": [
+        "Gemini AI"
+      ],
+      "decision_transparency": {
+        "factors_considered": [
+          "Content toxicity",
+          "User history",
+          "Context analysis",
+          "Pattern recognition"
+        ],
+        "appeal_process": "To appeal this decision, please contact our moderation team with your comment ID and any additional context that may help review your case."
+      },
+      "ethical_review": {
+        "compliant": true,
+        "warnings": [],
+        "suggestions": [
+          "Consider adding appeal process information"
+        ]
+      },
+      "bias_indicators": [],
+      "fairness_score": 1.0
+    },
+    "bias_indicators": [],
+    "fairness_score": 1.0,
+    "ethical_compliance": {
+      "compliant": true,
+      "warnings": [],
+      "suggestions": [
+        "Consider adding appeal process information"
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-10-25T16:37:07.656952",
+    "decision": {
+      "userID": 108,
+      "username": "tharushi",
+      "comment_id": 8,
+      "toxicity_score": 0.011,
+      "label": "General",
+      "risk_level": "Low",
+      "mitigation_action": "No action",
+      "final_status": "Safe",
+      "alert_method": "None",
+      "user_history_risk": 0.038,
+      "trend_priority": "Low",
+      "reasoning": "No explicit concerns identified",
+      "incident_logged": true,
+      "recommended_preventive_action": "",
+      "ai_systems_used": [
+        "Gemini AI"
+      ],
+      "decision_transparency": {
+        "factors_considered": [
+          "Content toxicity",
+          "User history",
+          "Context analysis",
+          "Pattern recognition"
+        ],
+        "appeal_process": "To appeal this decision, please contact our moderation team with your comment ID and any additional context that may help review your case."
+      },
+      "ethical_review": {
+        "compliant": true,
+        "warnings": [],
+        "suggestions": []
+      },
+      "bias_indicators": [],
+      "fairness_score": 1.0
+    },
+    "bias_indicators": [],
+    "fairness_score": 1.0,
+    "ethical_compliance": {
+      "compliant": true,
+      "warnings": [],
+      "suggestions": []
+    }
+  },
+  {
+    "timestamp": "2025-10-25T16:37:10.099769",
+    "decision": {
+      "userID": 109,
+      "username": "kasun",
+      "comment_id": 9,
+      "toxicity_score": 0.405,
+      "label": "Cyberbullying",
+      "risk_level": "High",
+      "mitigation_action": "Add to review queue",
+      "final_status": "Under Review",
+      "alert_method": "Dashboard",
+      "user_history_risk": 0.52,
+      "trend_priority": "Medium",
+      "reasoning": "Contains hate speech; Contains inappropriate language; Shows negative sentiment",
+      "incident_logged": true,
+      "recommended_preventive_action": "",
+      "ai_systems_used": [
+        "Gemini AI"
+      ],
+      "decision_transparency": {
+        "factors_considered": [
+          "Content toxicity",
+          "User history",
+          "Context analysis",
+          "Pattern recognition"
+        ],
+        "appeal_process": "To appeal this decision, please contact our moderation team with your comment ID and any additional context that may help review your case."
+      },
+      "ethical_review": {
+        "compliant": true,
+        "warnings": [],
+        "suggestions": []
+      },
+      "bias_indicators": [],
+      "fairness_score": 1.0
+    },
+    "bias_indicators": [],
+    "fairness_score": 1.0,
+    "ethical_compliance": {
+      "compliant": true,
+      "warnings": [],
+      "suggestions": []
+    }
+  },
+  {
+    "timestamp": "2025-10-25T16:37:12.600710",
+    "decision": {
+      "userID": 110,
+      "username": "anushi",
+      "comment_id": 10,
+      "toxicity_score": 0.129,
+      "label": "Privacy Leak",
+      "risk_level": "Medium",
+      "mitigation_action": "Notify moderator (privacy)",
+      "final_status": "Flagged",
+      "alert_method": "Email + Dashboard",
+      "user_history_risk": 0.429,
+      "trend_priority": "Low",
+      "reasoning": "Contains potential privacy information; Shows patterns of potential scam",
+      "incident_logged": true,
+      "recommended_preventive_action": "",
+      "ai_systems_used": [
+        "Gemini AI"
+      ],
+      "decision_transparency": {
+        "factors_considered": [
+          "Content toxicity",
+          "User history",
+          "Context analysis",
+          "Pattern recognition"
+        ],
+        "appeal_process": "To appeal this decision, please contact our moderation team with your comment ID and any additional context that may help review your case."
+      },
+      "ethical_review": {
+        "compliant": true,
+        "warnings": [],
+        "suggestions": [
+          "Consider adding appeal process information"
+        ]
+      },
+      "bias_indicators": [],
+      "fairness_score": 1.0
+    },
+    "bias_indicators": [],
+    "fairness_score": 1.0,
+    "ethical_compliance": {
+      "compliant": true,
+      "warnings": [],
+      "suggestions": [
+        "Consider adding appeal process information"
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-10-25T16:37:16.977718",
+    "decision": {
+      "userID": 111,
+      "username": "sanduni",
+      "comment_id": 11,
+      "toxicity_score": 0.015,
+      "label": "General",
+      "risk_level": "Low",
+      "mitigation_action": "No action",
+      "final_status": "Safe",
+      "alert_method": "None",
+      "user_history_risk": 0.05,
+      "trend_priority": "Low",
+      "reasoning": "No explicit concerns identified",
+      "incident_logged": true,
+      "recommended_preventive_action": "",
+      "ai_systems_used": [
+        "Gemini AI"
+      ],
+      "decision_transparency": {
+        "factors_considered": [
+          "Content toxicity",
+          "User history",
+          "Context analysis",
+          "Pattern recognition"
+        ],
+        "appeal_process": "To appeal this decision, please contact our moderation team with your comment ID and any additional context that may help review your case."
+      },
+      "ethical_review": {
+        "compliant": true,
+        "warnings": [],
+        "suggestions": []
+      },
+      "bias_indicators": [],
+      "fairness_score": 1.0
+    },
+    "bias_indicators": [],
+    "fairness_score": 1.0,
+    "ethical_compliance": {
+      "compliant": true,
+      "warnings": [],
+      "suggestions": []
+    }
+  },
+  {
+    "timestamp": "2025-10-25T16:37:20.030099",
+    "decision": {
+      "userID": 112,
+      "username": "praveen",
+      "comment_id": 12,
+      "toxicity_score": 0.26,
+      "label": "Cyberbullying",
+      "risk_level": "Medium",
+      "mitigation_action": "Show warning to user",
+      "final_status": "Under Review",
+      "alert_method": "Dashboard",
+      "user_history_risk": 0.3341,
+      "trend_priority": "Low",
+      "reasoning": "Contains hate speech; Shows negative sentiment",
+      "incident_logged": true,
+      "recommended_preventive_action": "",
+      "ai_systems_used": [
+        "Gemini AI"
+      ],
+      "decision_transparency": {
+        "factors_considered": [
+          "Content toxicity",
+          "User history",
+          "Context analysis",
+          "Pattern recognition"
+        ],
+        "appeal_process": "To appeal this decision, please contact our moderation team with your comment ID and any additional context that may help review your case."
+      },
+      "ethical_review": {
+        "compliant": true,
+        "warnings": [],
+        "suggestions": []
+      },
+      "bias_indicators": [],
+      "fairness_score": 1.0
+    },
+    "bias_indicators": [],
+    "fairness_score": 1.0,
+    "ethical_compliance": {
+      "compliant": true,
+      "warnings": [],
+      "suggestions": []
+    }
+  },
+  {
+    "timestamp": "2025-10-25T16:37:23.002241",
+    "decision": {
+      "userID": 113,
+      "username": "dulmi",
+      "comment_id": 13,
+      "toxicity_score": 0.129,
+      "label": "Privacy Leak",
+      "risk_level": "Medium",
+      "mitigation_action": "Notify moderator (privacy)",
+      "final_status": "Flagged",
+      "alert_method": "Email + Dashboard",
+      "user_history_risk": 0.429,
+      "trend_priority": "Low",
+      "reasoning": "Contains potential privacy information; Shows patterns of potential scam",
+      "incident_logged": true,
+      "recommended_preventive_action": "",
+      "ai_systems_used": [
+        "Gemini AI"
+      ],
+      "decision_transparency": {
+        "factors_considered": [
+          "Content toxicity",
+          "User history",
+          "Context analysis",
+          "Pattern recognition"
+        ],
+        "appeal_process": "To appeal this decision, please contact our moderation team with your comment ID and any additional context that may help review your case."
+      },
+      "ethical_review": {
+        "compliant": true,
+        "warnings": [],
+        "suggestions": [
+          "Consider adding appeal process information"
+        ]
+      },
+      "bias_indicators": [],
+      "fairness_score": 1.0
+    },
+    "bias_indicators": [],
+    "fairness_score": 1.0,
+    "ethical_compliance": {
+      "compliant": true,
+      "warnings": [],
+      "suggestions": [
+        "Consider adding appeal process information"
+      ]
+    }
   }
 ]
