@@ -4,14 +4,11 @@ import os
 import json
 import requests
 from typing import Dict, Any, List, Tuple
-from api_helpers import call_hf_batch, call_perspective_cached
+from api_helpers import call_perspective_cached
 
 # Optional imports for improved models (dynamic to avoid static resolution errors)
 VADER_AVAILABLE = False
-SBERT_AVAILABLE = False
-TRANSFORMERS_AVAILABLE = False
 _vader = None
-_sbert_model = None
 try:
     import importlib
     vader_mod = importlib.import_module("vaderSentiment.vaderSentiment")
@@ -20,23 +17,6 @@ try:
     VADER_AVAILABLE = True
 except Exception:
     VADER_AVAILABLE = False
-
-try:
-    import importlib
-    st_mod = importlib.import_module("sentence_transformers")
-    SentenceTransformer = getattr(st_mod, "SentenceTransformer")
-    _sbert_model = SentenceTransformer('all-MiniLM-L6-v2')
-    SBERT_AVAILABLE = True
-except Exception:
-    SBERT_AVAILABLE = False
-
-try:
-    import importlib
-    transformers_mod = importlib.import_module("transformers")
-    pipeline = getattr(transformers_mod, "pipeline")
-    TRANSFORMERS_AVAILABLE = True
-except Exception:
-    TRANSFORMERS_AVAILABLE = False
 
 # Optional Presidio imports for PII detection (if installed)
 try:
@@ -57,23 +37,7 @@ def call_perspective_toxicity(text: str) -> Dict[str, Any]:
     return {}
 
 
-def call_huggingface_model(model: str, payload: Any) -> Any:
-    """Generic call to Hugging Face Inference API for a given model name.
-    Returns the JSON-decoded response or None on failure.
-    Requires HUGGINGFACE_API_KEY in env.
-    """
-    # Use api_helpers batch/single cached calls where appropriate
-    hf_key = os.environ.get("HUGGINGFACE_API_KEY")
-    if not hf_key or not model:
-        return None
-    # For single-call convenience, use call_hf_batch on single-item list and return first
-    try:
-        res = call_hf_batch(model, [payload.get("inputs") if isinstance(payload, dict) else payload], hf_key)
-        if res and len(res) > 0:
-            return res[0]
-    except Exception:
-        pass
-    return None
+# Local text analysis is used instead of external APIs
 
 # Lightweight free-rule-based content analyzer for demo purposes
 # Detect bad language, hate speech, PII, scam patterns, extract sentiment, emotion, topic, summary, and optional embedding
@@ -90,19 +54,7 @@ TOPICS = ["personal_attack", "harassment", "spam", "safety", "privacy"]
 
 
 def simple_embedding(text: str, dim: int = 8) -> List[float]:
-    # Prefer sentence-transformers if available
-    if SBERT_AVAILABLE:
-        try:
-            emb = _sbert_model.encode([text])[0]
-            # emb may be numpy array
-            try:
-                lst = emb.tolist()
-            except Exception:
-                lst = list(emb)
-            return [float(x) for x in lst]
-        except Exception:
-            pass
-    # Fallback to random embedding
+    # Simple random embedding based on text hash
     random.seed(hash(text) & 0xffffffff)
     return [round(random.random(), 3) for _ in range(dim)]
 
@@ -113,7 +65,7 @@ def contains_bad_word(text: str) -> bool:
 
 
 def detect_hate(text: str) -> bool:
-    # Use a simple heuristic and optionally a transformer zero-shot classifier
+    # Simple rule-based hate speech detection
     t = text.lower()
     # if explicit patterns match, flag
     if any(re.search(p, t) for p in HATE_PATTERNS):
@@ -121,8 +73,7 @@ def detect_hate(text: str) -> bool:
     # if bad words present, flag
     if contains_bad_word(text):
         return True
-    # detect direct threats toward a person (e.g., "I'll destroy your account", "I will kill you")
-    # look for second-person references and violent verbs
+    # detect direct threats toward a person
     if re.search(r"\byou\b", t):
         for v in VIOLENT_VERBS:
             if v in t:
@@ -130,18 +81,6 @@ def detect_hate(text: str) -> bool:
     # also detect first-person threats directed at 'you'
     if re.search(r"\b(i\s*(will|'ll|am going to)\s+(kill|destroy|ruin|attack|harm))\b", t):
         return True
-    # Optionally use HF zero-shot to detect "hate speech" label
-    if TRANSFORMERS_AVAILABLE:
-        try:
-            classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
-            res = classifier(text, candidate_labels=["hate speech", "not hate speech"], multi_label=False)
-            if res and res.get("labels") and res.get("scores"):
-                label = res["labels"][0]
-                score = res["scores"][0]
-                if label == "hate speech" and score > 0.6:
-                    return True
-        except Exception:
-            pass
     return False
 
 
@@ -161,37 +100,45 @@ def detect_pii(text: str) -> bool:
 
 
 def detect_scam(text: str) -> bool:
-    # Phrase-based detection: look for scam-like ngrams
+    # Check URLs using VirusTotal API
+    if URL_REGEX.search(text):
+        print("[API Status] ✓ URL detected, checking with URL Safety API")
+        try:
+            from api_helpers import call_virustotal_cached
+            api_key = os.environ.get("VIRUSTOTAL_API_KEY")
+            m = URL_REGEX.search(text)
+            url = m.group(0)
+            result = call_virustotal_cached(url, api_key)
+            if result:
+                positives = result.get('positives', 0)
+                if positives > 0:
+                    print("[API Status] ✓ URL Safety API: URL flagged as suspicious")
+                    return True
+                print("[API Status] ✓ URL Safety API: URL appears safe")
+                return False
+        except Exception as e:
+            print(f"[API Status] ❌ URL Safety API error: {str(e)}")
+            # Fall back to basic detection
+            
+    # Basic scam detection fallback
     t = text.lower()
     scam_phrases = ["free money", "click here", "bank account", "wire transfer", "claim prize", "limited offer"]
     for p in scam_phrases:
         if p in t:
             return True
-    # Detect URLs or bare domains (e.g., scam.com) as potentially malicious
+            
+    # Check for suspicious domains
     if URL_REGEX.search(text):
-        # if domain contains suspicious keywords or no context, flag as potential scam
         m = URL_REGEX.search(text)
         domain = m.group(0).lower() if m else ""
         if "scam" in domain or "free" in domain or "win" in domain:
             return True
-        # otherwise, flag links as suspicious by default
-        return True
-    # fallback keyword match
+            
+    # Keyword match
     words = set(re.findall(r"\w+", t))
     if words & SCAM_KEYWORDS:
         return True
-    # Optional HF classifier for scams
-    if TRANSFORMERS_AVAILABLE:
-        try:
-            classifier = pipeline("text-classification", model="mrm8488/distilroberta-finetuned-financial-sentiment")
-            res = classifier(text)
-            # simplistic: if model returns label containing 'scam' or 'fraud' consider true
-            if isinstance(res, list) and len(res) > 0:
-                lab = res[0].get("label", "").lower()
-                if "scam" in lab or "fraud" in lab:
-                    return True
-        except Exception:
-            pass
+        
     return False
 
 
@@ -208,40 +155,18 @@ def sentiment_and_emotion(text: str) -> Tuple[str, str]:
             return "neutral", "neutral"
         except Exception:
             pass
-    # Fallback to HF sentiment if available
-    if TRANSFORMERS_AVAILABLE:
-        try:
-            sentiment_pipe = pipeline("sentiment-analysis")
-            res = sentiment_pipe(text)
-            if isinstance(res, list) and len(res) > 0:
-                lbl = res[0].get("label", "").lower()
-                if "pos" in lbl or "positive" in lbl:
-                    return "positive", "joy"
-                if "neg" in lbl or "negative" in lbl:
-                    return "negative", "sadness"
-        except Exception:
-            pass
-    # last-resort keyword fallback
+            
+    # Rule-based sentiment analysis
     t = text.lower()
-    if any(w in t for w in ["love", "great", "happy"]):
+    if any(w in t for w in ["love", "great", "happy", "excellent", "awesome"]):
         return "positive", "joy"
-    if any(w in t for w in ["hate", "disgusting", "stupid", "idiot", "kill"]):
+    if any(w in t for w in ["hate", "disgusting", "stupid", "idiot", "kill", "terrible", "awful"]):
         return "negative", "anger"
     return "neutral", "neutral"
 
 
 def topic_classify(text: str) -> str:
-    # Use HF zero-shot for topic classification if available
-    if TRANSFORMERS_AVAILABLE:
-        try:
-            classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
-            candidate_labels = ["personal_attack", "harassment", "spam", "safety", "privacy", "scam", "general"]
-            res = classifier(text, candidate_labels)
-            if res and res.get("labels") and res.get("scores"):
-                return res["labels"][0]
-        except Exception:
-            pass
-    # Fallback rule-based
+    # Rule-based topic classification
     t = text.lower()
     if detect_scam(text):
         return "scam"
@@ -278,6 +203,7 @@ def analyze_row(row: Dict[str, Any], embed: bool = True) -> Dict[str, Any]:
     embedding = simple_embedding(comment) if embed else None
 
     # Try Perspective API to enrich flags
+    print("[API Status] ✓ Processing content with Perspective API")
     perspective_attrs = call_perspective_toxicity(comment)
     if perspective_attrs:
         try:
@@ -290,23 +216,22 @@ def analyze_row(row: Dict[str, Any], embed: bool = True) -> Dict[str, Any]:
                 hate = True
             if prof > 0.6:
                 bad_language = True
+            print("[API Status] ✓ Perspective API analysis completed")
         except Exception:
+            print("[API Status] ⚠️ Error processing Perspective API results")
             pass
 
-    # Optionally call HuggingFace models for sentiment/emotion/summary/topic
-    hf_key = os.environ.get("HUGGINGFACE_API_KEY")
-    if hf_key:
-        # sentiment model
-        sent_out = call_huggingface_model("distilbert-base-uncased-finetuned-sst-2-english", {"inputs": comment})
-        if sent_out:
-            # HF classification returns e.g. [{label: 'POSITIVE', score: 0.99}]
-            try:
-                lbl = sent_out[0].get("label", "")
-                sentiment = "positive" if "POS" in lbl.upper() else "negative" if "NEG" in lbl.upper() else sentiment
-            except Exception:
-                pass
-        # summarization omitted (disabled)
-        # emotion/topic could be added similarly with dedicated models
+    # Use local text analysis for sentiment
+    print("[API Status] ✓ Starting local text analysis")
+    try:
+        # Local analysis is performed by TextBlob and NLTK
+        # These operations are already handled by sentiment_and_emotion()
+        sentiment, emotion = sentiment_and_emotion(comment)
+        print("[API Status] ✓ Text analysis completed successfully")
+    except Exception as e:
+        print(f"[API Status] ❌ Text analysis error: {str(e)}")
+        sentiment = "neutral"
+        emotion = "neutral"
 
     out = {
         "userID": row.get("userID"),
@@ -327,54 +252,13 @@ def analyze_row(row: Dict[str, Any], embed: bool = True) -> Dict[str, Any]:
 
 
 def analyze_batch(rows: List[Dict[str, Any]], embed: bool = True) -> List[Dict[str, Any]]:
-    """Process a batch of rows and return list of analyzed outputs. Uses HF and SBERT where available for efficiency.
-    """
-    comments = [str(r.get("comment", "")) for r in rows]
-    embeddings = None
-    if embed:
-        try:
-            if SBERT_AVAILABLE:
-                embs = _sbert_model.encode(comments)
-                # embs is iterable of arrays
-                embeddings = []
-                for e in embs:
-                    try:
-                        lst = e.tolist()
-                    except Exception:
-                        lst = list(e)
-                    embeddings.append([float(x) for x in lst])
-        except Exception:
-            embeddings = None
-
-    # Use batched HF calls for topic/sentiment enrichment if HF key present
-    hf_key = os.environ.get("HUGGINGFACE_API_KEY")
-    hf_model = os.environ.get("HF_TOPIC_MODEL", "facebook/bart-large-mnli")
-    hf_topic_outputs = None
-    if hf_key:
-        try:
-            hf_topic_outputs = call_hf_batch(hf_model, comments, hf_key)
-        except Exception:
-            hf_topic_outputs = None
-
+    """Process a batch of rows and return list of analyzed outputs."""
+    print("[API Status] ✓ Processing batch content analysis")
     results = []
-    for i, r in enumerate(rows):
-        res = analyze_row(r, embed=False)
-        # attach embedding
-        if embed:
-            if embeddings:
-                res["user_history_embedding"] = embeddings[i]
-            else:
-                res["user_history_embedding"] = simple_embedding(res.get("comment", ""))
-        # map HF topic output if available
-        if hf_topic_outputs and i < len(hf_topic_outputs) and hf_topic_outputs[i]:
-            try:
-                # zero-shot returns labels/scores
-                out = hf_topic_outputs[i]
-                if isinstance(out, dict) and "labels" in out and isinstance(out["labels"], list):
-                    res["topic"] = out["labels"][0]
-            except Exception:
-                pass
+    for r in rows:
+        res = analyze_row(r, embed=embed)
         results.append(res)
+    print("[API Status] ✓ Batch analysis completed successfully")
     return results
 
 

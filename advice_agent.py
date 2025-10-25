@@ -5,22 +5,58 @@ import json
 import time
 
 
+import google.generativeai as genai
+import json
+
+def setup_gemini():
+    """Setup Gemini API with credentials and specified model"""
+    api_key = os.environ.get("GEMINI_API_KEY")
+    model_name = os.environ.get("GEMINI_MODEL", "gemini-pro")
+    
+    if not api_key:
+        print("[API Status] ❌ Gemini API call failed: No API key provided")
+        return None
+        
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name)
+        print(f"[API Status] ✓ Gemini API initialized with model: {model_name}")
+        return model
+    except Exception as e:
+        print(f"[API Status] ❌ Failed to setup Gemini API: {e}")
+        return None
+
 def _build_prompt(risk_out: Dict[str, Any], mitigation_out: Dict[str, Any] = None) -> str:
-    parts = [
-        "You are an assistant that generates concise moderation advice based on a risk analysis.",
-        "Respond ONLY with a JSON object with keys: advice (string), moderation_suggestion (string), trend (string).",
-        "Do not add commentary outside the JSON object.",
-        "",
-        "Context:",
-        f"risk_level: {risk_out.get('risk_level')}",
-        f"risk_score: {risk_out.get('risk_score')}",
-        f"risk_reason: {risk_out.get('risk_reason')}",
-        f"label: {(mitigation_out or {}).get('label') or risk_out.get('label')}",
-        f"comment: {(mitigation_out or {}).get('comment') or risk_out.get('comment')}",
-        "",
-        "Return JSON exactly like: {\"advice\": \"...\", \"moderation_suggestion\": \"...\", \"trend\": \"...\"}",
-    ]
-    return "\n".join(parts)
+    """Build a structured prompt for Gemini API to analyze content and generate advice"""
+    comment = (mitigation_out or {}).get('comment') or risk_out.get('comment', '')
+    risk_score = float(risk_out.get('risk_score', 0) or 0)
+    risk_level = risk_out.get('risk_level', 'Low')
+    
+    prompt = f"""You are an AI moderation assistant. Analyze this social media comment and provide structured advice.
+
+Comment to analyze: "{comment}"
+Risk Score: {risk_score} (on a scale of 0.0 to 1.0)
+Risk Level: {risk_level}
+
+Respond with a JSON object containing exactly these three fields:
+- "advice": (string) Clear, specific recommendations for handling this content
+- "moderation_suggestion": (string) Step-by-step actions for moderators
+- "trend": (string) Brief analysis of behavior patterns and potential trends
+
+Risk level guidelines:
+- Low (0.0-0.3): Monitor only
+- Medium (0.3-0.7): Review required
+- High (0.7-1.0): Immediate action needed
+
+Format your entire response as a valid JSON object like this:
+{{
+  "advice": "string with specific advice",
+  "moderation_suggestion": "string with clear steps",
+  "trend": "string describing patterns"
+}}
+
+Do not include any text outside the JSON object."""
+    return prompt
 
 
 def _parse_json_from_text(text: str) -> Optional[Dict[str, Any]]:
@@ -40,88 +76,37 @@ def _parse_json_from_text(text: str) -> Optional[Dict[str, Any]]:
 
 
 def call_external_advice_api(risk_out: Dict[str, Any], mitigation_out: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
-    """Try external advice sources in this order:
-    1) ADVICE_AGENT_URL custom hosted endpoint -> POST {base}/advise
-    2) ADVICE_API_PROVIDER == openai -> OpenAI Chat Completions
-    3) ADVICE_API_PROVIDER == huggingface -> Hugging Face Inference API
-
-    Returns parsed dict or None on failure.
+    """Generate advice using Google's Gemini API.
+    Falls back to local processing if Gemini is not available.
     """
-    payload = {**(risk_out or {}), "mitigation": mitigation_out or {}}
-
-    # 1) Custom hosted API
-    base = os.environ.get("ADVICE_AGENT_URL")
-    if base:
-        try:
-            resp = requests.post(str(base).rstrip("/") + "/advise", json=payload, timeout=12)
-            if resp.status_code == 200:
-                data = resp.json()
-                if isinstance(data, dict):
-                    return data
-        except Exception:
-            # continue to other providers
-            pass
-
-    provider = os.environ.get("ADVICE_API_PROVIDER", "openai").lower()
+    model = setup_gemini()
+    if not model:
+        return None
+        
     prompt = _build_prompt(risk_out, mitigation_out)
-
-    # 2) OpenAI
-    if provider == "openai":
-        key = os.environ.get("OPENAI_API_KEY")
-        if not key:
+    
+    try:
+        print("[API Status] 🤖 Generating advice with Gemini AI...")
+        
+        response = model.generate_content(prompt)
+        if not response:
+            print("[API Status] ❌ Gemini API returned empty response")
             return None
-        model = os.environ.get("ADVICE_MODEL", "gpt-3.5-turbo")
-        url = "https://api.openai.com/v1/chat/completions"
-        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-        body = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": "You MUST return only a JSON object with keys: advice, moderation_suggestion, trend."},
-                {"role": "user", "content": prompt},
-            ],
-            "temperature": float(os.environ.get("ADVICE_TEMP", 0.2)),
-            "max_tokens": int(os.environ.get("ADVICE_MAX_TOKENS", 400)),
-        }
-        try:
-            r = requests.post(url, headers=headers, json=body, timeout=15)
-            if r.status_code in (200, 201):
-                j = r.json()
-                text = j.get("choices", [{}])[0].get("message", {}).get("content") or j.get("choices", [{}])[0].get("text", "")
-                parsed = _parse_json_from_text(text)
-                return parsed
-        except Exception:
+            
+        # Extract JSON from response
+        text = response.text
+        parsed = _parse_json_from_text(text)
+        if parsed and all(k in parsed for k in ["advice", "moderation_suggestion", "trend"]):
+            print("[API Status] ✓ Successfully generated advice with Gemini AI")
+            return parsed
+        else:
+            print("[API Status] ⚠️ Gemini response missing required fields")
             return None
-
-    # 3) Hugging Face Inference
-    if provider == "huggingface":
-        key = os.environ.get("HUGGINGFACE_API_KEY")
-        if not key:
-            return None
-        model = os.environ.get("ADVICE_MODEL", "google/flan-t5-large")
-        url = f"https://api-inference.huggingface.co/models/{model}"
-        headers = {"Authorization": f"Bearer {key}", "Accept": "application/json"}
-        # ask model to return JSON only
-        prompt_text = prompt + "\n\nRespond with a JSON object only."
-        body = {"inputs": prompt_text, "options": {"wait_for_model": True}}
-        try:
-            r = requests.post(url, headers=headers, json=body, timeout=30)
-            if r.status_code == 200:
-                try:
-                    data = r.json()
-                    # HF sometimes returns [{'generated_text': '...'}]
-                    if isinstance(data, dict) and "generated_text" in data:
-                        txt = data["generated_text"]
-                    elif isinstance(data, list) and len(data) and isinstance(data[0], dict) and "generated_text" in data[0]:
-                        txt = data[0]["generated_text"]
-                    else:
-                        txt = r.text
-                except Exception:
-                    txt = r.text
-                parsed = _parse_json_from_text(txt)
-                return parsed
-        except Exception:
-            return None
-
+            
+    except Exception as e:
+        print(f"[API Status] ❌ Gemini API error: {e}")
+        return None
+    
     return None
 
 
@@ -216,36 +201,65 @@ def builtin_advice(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def generate_advice(risk_out: Dict[str, Any], mitigation_out: Dict[str, Any] = None) -> Dict[str, Any]:
-    payload = {**(risk_out or {}), "mitigation": mitigation_out or {}}
-    # Try external providers first
-    external = call_external_advice_api(risk_out, mitigation_out)
-    # compute URL safety for the comment (conservative: no key or error => False)
+    """Generate moderation advice using Gemini API with risk score-based enhancement"""
+    
+    # Get advice from Gemini API
+    gemini_response = call_external_advice_api(risk_out, mitigation_out)
+    
+    # Check for URL safety
     try:
-        url_checks = find_and_check_urls_in_text(payload.get("comment", ""))
-        # If no URLs found, consider safe=True
-        if not url_checks:
-            urls_safe = True
-        else:
-            # urls_safe True only if all checks are True
-            urls_safe = all(bool(v) for v in url_checks.values())
+        url_checks = find_and_check_urls_in_text((mitigation_out or {}).get('comment', '') or risk_out.get('comment', ''))
+        urls_safe = True if not url_checks else all(bool(v) for v in url_checks.values())
     except Exception:
         urls_safe = False
-
-    if external and isinstance(external, dict):
-        return {
-            "userID": risk_out.get("userID"),
-            "username": risk_out.get("username"),
-            "comment_id": risk_out.get("comment_id"),
-            "advice": external.get("advice"),
-            "moderation_suggestion": external.get("moderation_suggestion"),
-            "trend": external.get("trend"),
-            # expose label from mitigation (if available) or risk label
-            "label": (mitigation_out or {}).get("label") or risk_out.get("label"),
-            # boolean column indicating whether URLs in the comment are safe
-            "urls_safe": urls_safe,
-            "predicted_behavior_risk": round(min(1.0, (risk_out.get("risk_score", 0) or 0) + 0.15), 3),
-            "source": "external",
-        }
+    
+    risk_score = float(risk_out.get('risk_score', 0) or 0)
+    
+    # Default values for the response
+    response_data = {
+        "userID": risk_out.get("userID"),
+        "username": risk_out.get("username"),
+        "comment_id": risk_out.get("comment_id"),
+        "advice": "",
+        "moderation_suggestion": "No specific moderation action needed",  # Default string value
+        "trend": "No significant trend detected",  # Default string value
+        "label": (mitigation_out or {}).get("label") or risk_out.get("label") or "Unclassified",
+        "urls_safe": urls_safe,
+        "predicted_behavior_risk": round(min(1.0, risk_score + 0.15), 3),
+        "source": "local"
+    }
+    
+    if gemini_response and isinstance(gemini_response, dict):
+        # Ensure all values are strings
+        advice = str(gemini_response.get('advice', ''))
+        moderation = str(gemini_response.get('moderation_suggestion', response_data["moderation_suggestion"]))
+        trend = str(gemini_response.get('trend', response_data["trend"]))
+        
+        # Enhance advice with risk score context
+        if risk_score >= 0.7:
+            advice = f"🚨 HIGH RISK - Immediate Action Required: {advice}"
+        elif risk_score >= 0.4:
+            advice = f"⚠️ MEDIUM RISK - Monitor Closely: {advice}"
+            
+        response_data.update({
+            "advice": advice,
+            "moderation_suggestion": moderation,
+            "trend": trend,
+            "source": "gemini"
+        })
+    else:
+        # If Gemini fails, generate a basic response based on risk score
+        if risk_score >= 0.7:
+            response_data["advice"] = "🚨 HIGH RISK: Immediate review required. Content may violate community guidelines."
+            response_data["moderation_suggestion"] = "Review immediately and take appropriate action based on content severity."
+        elif risk_score >= 0.4:
+            response_data["advice"] = "⚠️ MEDIUM RISK: Content requires monitoring and review."
+            response_data["moderation_suggestion"] = "Add to moderation queue for review."
+        else:
+            response_data["advice"] = "✅ LOW RISK: Content appears to be within community guidelines."
+            response_data["moderation_suggestion"] = "No immediate action required."
+    
+    return response_data
 
     # Fallback to deterministic local advice
     local = builtin_advice(payload)
@@ -254,7 +268,7 @@ def generate_advice(risk_out: Dict[str, Any], mitigation_out: Dict[str, Any] = N
         "username": risk_out.get("username"),
         "comment_id": risk_out.get("comment_id"),
         "advice": local.get("advice"),
-        "moderation_suggestion": local.get("moderation_suggestion"),
+        
         "trend": local.get("trend"),
         # expose label from mitigation (if available) or risk label
         "label": (mitigation_out or {}).get("label") or risk_out.get("label"),

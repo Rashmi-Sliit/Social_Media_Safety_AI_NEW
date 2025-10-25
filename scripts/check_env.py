@@ -17,7 +17,7 @@ try:
 except Exception:
     pass
 
-MASK_KEYS = ["SENDGRID_API_KEY", "SMTP_PASS", "HUGGINGFACE_API_KEY", "PERSPECTIVE_API_KEY"]
+MASK_KEYS = ["SENDGRID_API_KEY", "SMTP_PASS", "PERSPECTIVE_API_KEY"]
 
 
 def mask(v):
@@ -37,7 +37,7 @@ def show_env():
         "SMTP_PORT",
         "SMTP_USER",
         "SMTP_PASS",
-        "HUGGINGFACE_API_KEY",
+
         "PERSPECTIVE_API_KEY",
     ]
     out = {}

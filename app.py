@@ -47,8 +47,14 @@ with tab1:
     min_risk = st.sidebar.slider("Min risk score", 0.0, 1.0, 0.0, 0.05, key="min_risk_slider")
     user_search = st.sidebar.text_input("Search username contains", key="username_search")
 
-    st.sidebar.markdown("**AI Status:** <span class='ai-pulse'></span> <span style='margin-left:6px;'>Active</span>", unsafe_allow_html=True)
     st.sidebar.markdown("---")
+    
+    # API Status button in sidebar
+    st.sidebar.markdown("#### 🛠️ System")
+    if st.sidebar.button("🔌 View API Status", key="api_status_btn"):
+        st.session_state.show_api_status = True
+        st.rerun()
+    
     admin_alerts_open = st.sidebar.button("🚨 Open Admin Alerts Dashboard", key="admin_alerts_btn")
 
     # Quick test for email settings
@@ -82,38 +88,48 @@ with tab1:
 
     st.markdown("""
 <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">
+<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">
 <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>
 <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap\" rel=\"stylesheet\">
 <style>
-  :root { --electric:#00FFFF; --purple:#6A0DAD; --neon:#39FF14; --jet:#0D0D0D; }
+  :root { --electric:#2563EB; --purple:#6A0DAD; --neon:#16A34A; --text:#1E293B; }
   html, body, [class^=\"css\"] { font-family: 'Inter', sans-serif; }
-  .stApp { background: linear-gradient(120deg, rgba(0,255,255,0.10), rgba(106,13,173,0.10), rgba(57,255,20,0.10)); background-size: 200% 200%; animation: moveBg 16s ease infinite; }
+  .stApp { background: linear-gradient(120deg, rgba(37,99,235,0.05), rgba(106,13,173,0.05), rgba(22,163,74,0.05)); background-size: 200% 200%; animation: moveBg 16s ease infinite; }
   @keyframes moveBg { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
-  .ai-title { font-size: 42px; font-weight: 800; color: #E6F7FF; text-shadow: 0 0 8px var(--electric), 0 0 20px rgba(0,255,255,0.3); }
-  .subtitle { color: #BFBFBF; margin-top: -10px; }
-  .glass-card { background: rgba(13,13,13,0.65); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 14px 16px; box-shadow: 0 10px 28px rgba(0,0,0,0.35), 0 0 12px rgba(0,255,255,0.06); }
-  .glow-border { border: 1px solid rgba(0,255,255,0.3); box-shadow: 0 0 10px rgba(0,255,255,0.2) inset, 0 0 16px rgba(0,255,255,0.1); border-radius: 12px; }
-  .gradient-btn button { background: linear-gradient(90deg, var(--purple), var(--electric)); border: 0; color: #fff; font-weight: 700; border-radius: 12px; padding: 0.6rem 1.2rem; transition: transform .2s ease, box-shadow .2s ease; }
-  .gradient-btn button:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,255,255,0.25); }
+  .ai-title { font-size: 42px; font-weight: 800; color: var(--text); text-shadow: 0 0 8px rgba(37,99,235,0.2); }
+  .subtitle { color: #64748B; margin-top: -10px; }
+  .glass-card { background: rgba(255,255,255,0.9); border: 1px solid rgba(37,99,235,0.1); border-radius: 16px; padding: 14px 16px; box-shadow: 0 10px 28px rgba(37,99,235,0.1); }
+  .glow-border { border: 1px solid rgba(37,99,235,0.2); box-shadow: 0 0 10px rgba(37,99,235,0.1) inset, 0 0 16px rgba(37,99,235,0.05); border-radius: 12px; }
+  .gradient-btn button { background: linear-gradient(90deg, var(--electric), var(--neon)); border: 0; color: #fff; font-weight: 700; border-radius: 12px; padding: 0.6rem 1.2rem; transition: transform .2s ease, box-shadow .2s ease; }
+  .gradient-btn button:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(37,99,235,0.2); }
   .stTabs [data-baseweb=\"tab-list\"] { gap: 12px; }
-  .stTabs [data-baseweb=\"tab\"] { background: rgba(13,13,13,0.55); border-radius: 999px; padding: 8px 16px; color: #D8D8D8; border: 1px solid rgba(255,255,255,0.08); }
-  .stTabs [aria-selected=\"true\"] { border: 1px solid rgba(0,255,255,0.4); color: #fff; box-shadow: 0 0 10px rgba(0,255,255,0.15); }
-  section[data-testid=\"stSidebar\"] { background: rgba(13,13,13,0.85) !important; border-right: 1px solid rgba(255,255,255,0.06); }
-  .side-item { padding: 8px 10px; border-radius: 10px; margin-bottom: 6px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); color:#E6F7FF; }
-  .ai-pulse { width:10px;height:10px;border-radius:50%; background: var(--neon); box-shadow: 0 0 12px rgba(57,255,20,0.9); animation: pulse 1.6s infinite ease-in-out; display:inline-block; margin-bottom:-2px; }
+  .stTabs [data-baseweb=\"tab\"] { background: #F8FAFC; border-radius: 999px; padding: 8px 16px; color: var(--text); border: 1px solid rgba(37,99,235,0.1); }
+  .stTabs [aria-selected=\"true\"] { border: 1px solid rgba(37,99,235,0.4); color: var(--electric); box-shadow: 0 0 10px rgba(37,99,235,0.1); }
+  section[data-testid=\"stSidebar\"] { background: #F8FAFC !important; border-right: 1px solid rgba(37,99,235,0.1); }
+  .side-item { padding: 8px 10px; border-radius: 10px; margin-bottom: 6px; background: rgba(255,255,255,0.8); border: 1px solid rgba(37,99,235,0.1); color: var(--text); }
+  .ai-pulse { width:10px;height:10px;border-radius:50%; background: var(--neon); box-shadow: 0 0 12px rgba(22,163,74,0.4); animation: pulse 1.6s infinite ease-in-out; display:inline-block; margin-bottom:-2px; }
   @keyframes pulse { 0%{transform:scale(0.9); opacity:.8} 50%{transform:scale(1.2); opacity:1} 100%{transform:scale(0.9); opacity:.8} }
   .df-wrap { padding: 8px; border-radius: 12px; }
   .big-metric {font-size: 28px; font-weight: 800; color:#E6F7FF}
   .subtext {color: #9AA0A6;}
-  .risk-high {background:#2a0e0e;color:#ffb4b4;}
-  .risk-medium {background:#2a250e;color:#ffd58a;}
-  .risk-low {background:#0e2a17;color:#9dffb1;}
+  .risk-high {background:#FEE2E2;color:#991B1B;}
+  .risk-medium {background:#FEF3C7;color:#92400E;}
+  .risk-low {background:#DCFCE7;color:#166534;}
 </style>
 """, unsafe_allow_html=True)
 
     # Main dashboard title and content
     st.markdown("<div class='ai-title'>🧠 Social Media Safety AI</div>", unsafe_allow_html=True)
     st.markdown("<div class='subtitle'>Analyze social media content for safety and risk assessment</div>", unsafe_allow_html=True)
+    
+    # Check if we should show API Status page
+    if st.session_state.get('show_api_status', False):
+        import api_status_page
+        api_status_page.display_api_status_page()
+        if st.button("← Back to Dashboard"):
+            st.session_state.show_api_status = False
+            st.rerun()
+        st.stop()  # Stop here if showing API status page
 
     # Analysis mode selection
     analysis_mode = st.radio(
@@ -375,10 +391,10 @@ with tab1:
                 # Temporarily disable external APIs for speed
                 restore_env = {}
                 if fast_mode:
-                    for key in ["HUGGINGFACE_API_KEY", "PERSPECTIVE_API_KEY"]:
-                        if key in os.environ:
-                            restore_env[key] = os.environ[key]
-                            os.environ.pop(key, None)
+                    key = "PERSPECTIVE_API_KEY"
+                    if key in os.environ:
+                        restore_env[key] = os.environ[key]
+                        os.environ.pop(key, None)
 
             except Exception as e:
                 st.error(f"Failed to read CSV: {e}")
@@ -412,10 +428,10 @@ with tab1:
             # Temporarily disable external APIs for speed
             restore_env = {}
             if fast_mode:
-                for key in ["HUGGINGFACE_API_KEY", "PERSPECTIVE_API_KEY"]:
-                    if key in os.environ:
-                        restore_env[key] = os.environ[key]
-                        os.environ.pop(key, None)
+                key = "PERSPECTIVE_API_KEY"
+                if key in os.environ:
+                    restore_env[key] = os.environ[key]
+                    os.environ.pop(key, None)
 
             progress = st.progress(0)
             rows = []

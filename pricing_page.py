@@ -62,16 +62,16 @@ def display_pricing_page():
     st.markdown("""
     <style>
     :root {
-        --bg-main: #0F172A;
+        --bg-main: #FFFFFF;
         --accent: #2563EB;
-        --text: #F8FAFC;
-        --card-bg: rgba(37, 99, 235, 0.08);
-        --hover: #1E3A8A;
-        --success: #22C55E;
-        --error: #EF4444;
+        --text: #1E293B;
+        --card-bg: rgba(37, 99, 235, 0.03);
+        --hover: #1D4ED8;
+        --success: #16A34A;
+        --error: #DC2626;
         --glow: rgba(37, 99, 235, 0.1);
         --border: rgba(37, 99, 235, 0.15);
-        --card-shadow: rgba(15, 23, 42, 0.15);
+        --card-shadow: rgba(37, 99, 235, 0.1);
     }
 
     /* Main container background */

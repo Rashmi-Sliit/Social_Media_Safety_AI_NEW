@@ -2,7 +2,7 @@ from typing import Dict, Any
 import os
 import requests
 from email_helper import send_alert
-from api_helpers import call_perspective_cached, call_hf_single_cached, call_hf_batch
+from api_helpers import call_perspective_cached
 
 
 def call_perspective_toxicity_comment(text: str) -> float:
@@ -19,48 +19,83 @@ def call_perspective_toxicity_comment(text: str) -> float:
     return 0.0
 
 
-def call_hf_label_classify(comment: str, model: str = "facebook/bart-large-mnli") -> str:
-    hf_key = os.environ.get("HUGGINGFACE_API_KEY")
-    if not hf_key:
-        return ""
+# Removed HuggingFace label classification in favor of local analysis
+
+
+# Removed in favor of Perspective API and local analysis
+
+# Import Gemini AI for advanced reasoning
+import google.generativeai as genai
+
+def setup_gemini():
+    """Initialize Gemini AI with API key"""
+    api_key = os.environ.get("GEMINI_API_KEY")
+    model_name = os.environ.get("GEMINI_MODEL", "gemini-pro")
+    if not api_key:
+        print("[API Status] ❌ Gemini API not configured")
+        return None
     try:
-        # Use batch helper for single item to leverage caching
-        res = call_hf_batch(model, [comment], hf_key)
-        if res and len(res) > 0 and res[0]:
-            data = res[0]
-            if isinstance(data, dict) and "labels" in data and isinstance(data["labels"], list):
-                return data["labels"][0]
-            if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
-                return data[0].get("label", "")
-    except Exception:
-        pass
-    return ""
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name)
+        print(f"[API Status] ✓ Gemini initialized for reasoning generation")
+        return model
+    except Exception as e:
+        print(f"[API Status] ❌ Gemini setup failed: {e}")
+        return None
 
-
-def call_hf_toxicity_score(comment: str, model: str = "unitary/toxic-bert") -> float:
-    """Call a Hugging Face toxicity model via inference API and return a 0-1 score if available."""
-    hf_key = os.environ.get("HUGGINGFACE_API_KEY")
-    if not hf_key:
-        return 0.0
+def generate_reasoning(comment: str, toxicity: float, analyzed: Dict[str, Any]) -> str:
+    """Generate detailed reasoning about content toxicity using Gemini AI"""
+    model = setup_gemini()
+    if not model:
+        # Fallback to basic reasoning if Gemini is not available
+        return _generate_basic_reasoning(analyzed)
+        
+    prompt = f"""Analyze this social media comment and explain why it might be toxic or concerning.
+    Comment: "{comment}"
+    Toxicity Score: {toxicity}
+    
+    Consider these aspects in your analysis:
+    - Hate speech or offensive language
+    - Personal attacks or bullying
+    - Privacy concerns
+    - Scam indicators
+    - Emotional tone
+    - Potential harm or threats
+    
+    Return a concise, comma-separated list of reasons why this content might be problematic.
+    Format: "Reason 1, Reason 2, Reason 3"
+    If content appears safe, return "Content appears safe and within community guidelines"
+    """
+    
     try:
-        res = call_hf_batch(model, [comment], hf_key)
-        if res and len(res) > 0 and res[0]:
-            data = res[0]
-            if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
-                for item in data:
-                    lbl = item.get("label", "").lower()
-                    if "toxic" in lbl or "toxicity" in lbl:
-                        return float(item.get("score", 0.0))
-                return float(max((it.get("score", 0.0) for it in data), default=0.0))
-            if isinstance(data, dict):
-                if "score" in data:
-                    return float(data.get("score", 0.0))
-    except Exception:
-        pass
-    return 0.0
+        response = model.generate_content(prompt)
+        if response and response.text:
+            reasoning = response.text.strip().strip('"')  # Remove quotes if present
+            print(f"[API Status] ✓ Generated reasoning using Gemini AI")
+            return reasoning
+    except Exception as e:
+        print(f"[API Status] ❌ Gemini reasoning generation failed: {e}")
+    
+    return _generate_basic_reasoning(analyzed)
 
-# Simple mitigation: compute toxicity, categorize, decide action, and return explainable reasoning
+def _generate_basic_reasoning(analyzed: Dict[str, Any]) -> str:
+    """Fallback function for basic reasoning when Gemini is unavailable"""
+    reasons = []
+    if analyzed.get("hate_speech"):
+        reasons.append("Contains hate speech")
+    if analyzed.get("bad_language"):
+        reasons.append("Contains inappropriate language")
+    if analyzed.get("pii_detected"):
+        reasons.append("Contains potential privacy information")
+    if analyzed.get("scam_pattern"):
+        reasons.append("Shows patterns of potential scam")
+    if (analyzed.get("emotion") or "").lower() == "anger":
+        reasons.append("Displays angry or aggressive tone")
+    if (analyzed.get("sentiment") or "").lower() == "negative":
+        reasons.append("Shows negative sentiment")
+    return "; ".join(reasons) if reasons else "No explicit concerns identified"
 
+# Category keywords for basic classification
 CATEGORY_KEYWORDS = {
     "Cyberbullying": ["disgusting", "idiot", "hate", "stupid", "kill", "you people"],
     "Privacy Leak": ["email", "phone", "ssn", "address"],
@@ -69,7 +104,7 @@ CATEGORY_KEYWORDS = {
 
 
 def compute_toxicity(analyzed: Dict[str, Any], risk: Dict[str, Any]) -> float:
-    # Combine multiple signals: existing risk_score, Perspective API, HF toxicity model, and local flags
+    # Combine multiple signals: existing risk_score, Perspective API, and local flags
     base = float(risk.get("risk_score", 0.0))
     local = 0.0
     local += 0.1 if analyzed.get("bad_language") else 0.0
@@ -79,27 +114,20 @@ def compute_toxicity(analyzed: Dict[str, Any], risk: Dict[str, Any]) -> float:
     # perspective score
     perspective = call_perspective_toxicity_comment(analyzed.get("comment", ""))
 
-    # HF toxicity score
-    hf_tox = call_hf_toxicity_score(analyzed.get("comment", ""))
-
     # weights (can be tuned via env vars)
-    p_w = float(os.environ.get("PERSPECTIVE_WEIGHT", 0.5))
-    hf_w = float(os.environ.get("HF_TOX_WEIGHT", 0.3))
-    local_w = float(os.environ.get("LOCAL_WEIGHT", 0.2))
+    p_w = float(os.environ.get("PERSPECTIVE_WEIGHT", 0.6))
+    local_w = float(os.environ.get("LOCAL_WEIGHT", 0.3))
+    base_w = float(os.environ.get("BASE_RISK_WEIGHT", 0.1))
 
-    # If external APIs are not configured, rely more on local + base risk
-    if not os.environ.get("PERSPECTIVE_API_KEY") and not os.environ.get("HUGGINGFACE_API_KEY"):
+    # If Perspective API is not configured, rely more on local + base risk
+    if not os.environ.get("PERSPECTIVE_API_KEY"):
         p_w = 0.0
-        hf_w = 0.0
-        local_w = 0.6
-        base_w = 0.4
-    else:
-        base_w = float(os.environ.get("BASE_RISK_WEIGHT", 0.1))
+        local_w = 0.7
+        base_w = 0.3
 
-    combined = (p_w * perspective) + (hf_w * hf_tox) + (local_w * local) + (base_w * base)
-    # include base risk as small stabilizer if desired
+    combined = (p_w * perspective) + (local_w * local) + (base_w * base)
     # normalize by sum of weights
-    denom = p_w + hf_w + local_w + base_w
+    denom = p_w + local_w + base_w
     if denom > 0:
         combined = combined / denom
     combined = min(max(combined, 0.0), 1.0)
@@ -107,16 +135,7 @@ def compute_toxicity(analyzed: Dict[str, Any], risk: Dict[str, Any]) -> float:
 
 
 def categorize(comment: str) -> str:
-    # Prefer HF zero-shot category detection if API key present
-    hf_key = os.environ.get("HUGGINGFACE_API_KEY")
-    if hf_key:
-        try:
-            label = call_hf_label_classify(comment)
-            if label:
-                return label
-        except Exception:
-            pass
-    # Fallback to keyword rules
+    # Use keyword rules for basic categorization
     t = comment.lower()
     for cat, kws in CATEGORY_KEYWORDS.items():
         for k in kws:
@@ -193,32 +212,19 @@ def mitigate(analyzed: Dict[str, Any], risk: Dict[str, Any], advice: Dict[str, A
         except Exception:
             pass
     # Compute toxicity using perspective if available
-    perspective_tox = call_perspective_toxicity_comment(analyzed.get("comment", ""))
     toxicity = compute_toxicity(analyzed, risk)
-    # blend perspective score into toxicity
-    toxicity = round(min(1.0, max(toxicity, perspective_tox)), 3)
 
-    # Use HF to attempt label classification if available; derive label from analyzed fields as a fallback
-    hf_label = call_hf_label_classify(analyzed.get("comment", ""))
-    generated_label = derive_label_from_analyzed(analyzed)
-    # Prefer HF label if available, otherwise use derived generated_label
-    label = hf_label or generated_label or "Toxic"
+    # Use local analysis to derive label
+    label = derive_label_from_analyzed(analyzed)
     action = decide_action(toxicity, label)
-    reasoning = []
-    if analyzed.get("hate_speech"):
-        reasoning.append("Contains hate speech")
-    if analyzed.get("bad_language"):
-        reasoning.append("Bad language detected")
-    if analyzed.get("pii_detected"):
-        reasoning.append("Possible privacy leak")
-    if analyzed.get("scam_pattern"):
-        reasoning.append("Possible scam/spam pattern")
-    if (analyzed.get("emotion") or "").lower() == "anger":
-        reasoning.append("Anger emotion detected")
-    if (analyzed.get("sentiment") or "").lower() == "negative":
-        reasoning.append("Negative sentiment")
+    
+    # Generate detailed reasoning using Gemini AI
+    comment = analyzed.get("comment", "")
+    reasoning = generate_reasoning(comment, toxicity, analyzed)
+    
+    # Add user risk context if high
     if risk.get("user_cumulative_risk") and risk["user_cumulative_risk"] > 0.7:
-        reasoning.append("User has high cumulative risk")
+        reasoning = f"{reasoning}, User has concerning history with high cumulative risk"
 
     out = {
         "userID": analyzed.get("userID"),
@@ -233,7 +239,7 @@ def mitigate(analyzed: Dict[str, Any], risk: Dict[str, Any], advice: Dict[str, A
         "alert_method": action["alert_method"],
         "user_history_risk": risk.get("user_cumulative_risk"),
         "trend_priority": "High" if toxicity > 0.7 else "Medium" if toxicity > 0.4 else "Low",
-        "reasoning": "; ".join(reasoning) if reasoning else "No explicit reasons",
+        "reasoning": reasoning,
         "incident_logged": True,
         "recommended_preventive_action": advice.get("moderation_suggestion", ""),
     }
