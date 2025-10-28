@@ -1,0 +1,14 @@
+streamlit>=1.0
+pandas
+requests
+python-dotenv
+spacy
+presidio-analyzer
+presidio-anonymizer
+transformers
+torch
+pyod
+sentence-transformers
+vaderSentiment
+fastapi
+uvicorn
