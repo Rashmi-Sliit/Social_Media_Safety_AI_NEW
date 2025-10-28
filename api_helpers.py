@@ -75,4 +75,26 @@ def call_perspective_cached(text: str, api_key: Optional[str]) -> Optional[Dict[
     return None
 
 
-# Using local text analysis only
+# VirusTotal API integration
+def call_virustotal_cached(url: str, api_key: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Call VirusTotal API with caching. Returns parsed JSON or None."""
+    if not api_key:
+        return None
+        
+    key = f"virustotal:{hash(url)}"
+    cached = cache_get(key)
+    if cached is not None:
+        return cached
+        
+    try:
+        vt_url = "https://www.virustotal.com/vtapi/v2/url/report"
+        params = {"apikey": api_key, "resource": url}
+        resp = session().get(vt_url, params=params, timeout=15)
+        
+        if resp.status_code == 200:
+            j = resp.json()
+            cache_set(key, j)
+            return j
+    except Exception:
+        pass
+    return None

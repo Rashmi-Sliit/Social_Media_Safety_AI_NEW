@@ -100,25 +100,13 @@ def detect_pii(text: str) -> bool:
 
 
 def detect_scam(text: str) -> bool:
-    # Check URLs using VirusTotal API
+    # Basic URL check without VirusTotal API
     if URL_REGEX.search(text):
-        print("[API Status] ✓ URL detected, checking with URL Safety API")
-        try:
-            from api_helpers import call_virustotal_cached
-            api_key = os.environ.get("VIRUSTOTAL_API_KEY")
-            m = URL_REGEX.search(text)
-            url = m.group(0)
-            result = call_virustotal_cached(url, api_key)
-            if result:
-                positives = result.get('positives', 0)
-                if positives > 0:
-                    print("[API Status] ✓ URL Safety API: URL flagged as suspicious")
-                    return True
-                print("[API Status] ✓ URL Safety API: URL appears safe")
-                return False
-        except Exception as e:
-            print(f"[API Status] ❌ URL Safety API error: {str(e)}")
-            # Fall back to basic detection
+        m = URL_REGEX.search(text)
+        domain = m.group(0).lower()
+        suspicious_domains = ["scam", "free", "win", "prize", "contest", "lucky", "crypto", "wallet"]
+        if any(sus in domain for sus in suspicious_domains):
+            return True
             
     # Basic scam detection fallback
     t = text.lower()
